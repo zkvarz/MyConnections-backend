@@ -7,6 +7,20 @@ var bodyParser = require('body-parser');
 
 var routes = require('./routes/index');
 var users = require('./routes/users');
+var account = require('./routes/account');
+
+//mongodb database
+var MongoClient = require('mongodb').MongoClient;
+var assert = require("assert");
+
+//database connection
+var databaseUrl = 'mongodb://localhost:27017/myconnections-backend';
+MongoClient.connect(databaseUrl, function(err, db) {
+  assert.equal(err);
+  console.log("Connected correctly to server");
+
+  db.close();
+});
 
 var app = express();
 
@@ -24,6 +38,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', routes);
 app.use('/users', users);
+app.use('/account', account);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
@@ -58,3 +73,6 @@ app.use(function(err, req, res, next) {
 
 
 module.exports = app;
+
+global.mongoclient = MongoClient;
+global.databaseUrl = databaseUrl;

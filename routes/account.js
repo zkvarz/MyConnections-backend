@@ -3,104 +3,120 @@ var router = express.Router();
 
 var assert = require('assert');
 
-var USERS = "users";
-var PHONE = "phone";
-var PASSWORD = "password";
+var users = "users";
+var phone = "phone";
+var password = "password";
 
 /* POST account. */
 router.post('/create', function(req, res, next) {
-    
-    if(!isHeaderValid(req, res))  return res.sendStatus(400);
 
-    var phone;
-    var password;
+    if (!isHeaderValid(req, res)) return res.sendStatus(400);
+
+    var phoneString = req.body.phone;
+    var passwordString = req.body.password;
 
     // check phone & password
-    if (req.body.phone && req.body.password) {
-        phone = req.body.phone;
-        password = req.body.password;
+    if (phoneString && passwordString) {
 
-        var insertDocument = function(db, callback) {
+        var createIndex = function(db, callback) {
             // Get the documents collection
-            var collection = db.collection(USERS);
-            // Insert some documents
-            collection.insertOne({
-                PHONE: phone,
-                PASSWORD: password
-            }, function(err, result) {
-                assert.equal(err, null);
-                console.log("Inserted a document into the users collection.");
-                callback(result);
-            });
+            var collection = db.collection(users);
+
+            collection.createIndex({
+                    "phone": 1
+                }, {
+                    unique: true
+                },
+                // null,
+                function(err, results) {
+                    if (err) console.log(err)
+                        // assert.equal(err, null);
+                    console.log("user createIndex")
+                    console.log(results);
+
+                    callback(collection);
+
+
+                }
+            );
         }
 
         global.mongoclient.connect(global.databaseUrl, function(err, db) {
             assert.equal(null, err);
-            insertDocument(db, function() {
-                db.close();
+            createIndex(db, function(collection) {
+                console.log("insertDocument finished")
+
+                //  var collection = db.collection(users);
+                console.log("user insertion " + collection)
+                collection.ensureIndex({
+                    "phone": 1
+                }, {
+                    unique: true
+                }, function(err, indexName) {
+                    if (err) {
+                        console.log(err)
+                        return;
+                    }
+
+                    // Insert some documents
+                    collection.insertOne({
+                        phone: phoneString,
+                        password: passwordString
+                    }, function(err, result) {
+                        if (err) {
+                            console.log("Duplicate key!");
+                            console.log(err)
+                            db.close();
+                             res.writeHead(400, {'Content-Type': 'text/plain'});
+                            //  res.end('ok');
+                             return res.end("Sorry, user already exists.");
+                            //  return res.sendStatus(400);
+                        }
+                        else {
+                            db.close();
+                            console.log("Inserted a document into the users collection.");
+                             return res.sendStatus(200);
+                        }
+
+                    });
+
+
+                });
+
             });
         });
 
 
-        return res.sendStatus(201);
     }
     else {
-    //   res.write("Incorrect parameters!");
-      return res.sendStatus(400);
+        return res.sendStatus(400);
     }
 
 });
 
 /* GET users. */
 router.get('/getUsers', function(req, res, next) {
-//   if(!isHeaderValid(req, res))  return res.sendStatus(400);
+    // if (!isHeaderValid(req, res)) return res.sendStatus(400);
 
     var findUsers = function(db, callback) {
-        
-/*         db.collection('teams', function(err, collection) {
-        if (!err) {
-          collection.find({
-            'GroupName': PHONE
-          }).toArray(function(err, docs) {
-            if (!err) {
-              db.close();
-              var intCount = docs.length;
-              if (intCount > 0) {
-                var strJson = "";
-                for (var i = 0; i < intCount;) {
-                  strJson += '{"country":"' + docs[i].country + '"}'
-                  i = i + 1;
-                  if (i < intCount) {
-                    strJson += ',';
-                  }
-                }
-                strJson = '{"GroupName":"' + PHONE + '","count":' + intCount + ',"teams":[' + strJson + "]}"
-                res.write(JSON.parse(strJson));
-                callback("", JSON.parse(strJson));
-              }
-            } else {
-              //onErr(err, callback);
-            }
-          }); //end collection.find 
-        } else {
-          //onErr(err, callback);
-        }
-      }); //end db.collection*/
-        
-        var cursor = db.collection(USERS).find();
-        
-        
+        var jsonString = "";
+
+        var cursor = db.collection(users).find();
         cursor.each(function(err, doc) {
             assert.equal(err, null);
             if (doc != null) {
-               console.log("should be printed " + doc.length);
-               console.dir(doc);
-               return res.send(JSON.stringify(doc));
+                console.dir(doc);
+
+                jsonString += JSON.stringify(doc);
+                console.log(jsonString);
             }
             else {
+                console.log("No Users Found");
+                res.end(jsonString);
                 callback();
             }
         });
+
     };
 
     global.mongoclient.connect(global.databaseUrl, function(err, db) {
@@ -109,8 +125,8 @@ router.get('/getUsers', function(req, res, next) {
             db.close();
         });
     });
-    
-    
+
+
     // return res.sendStatus(200);
 
 });

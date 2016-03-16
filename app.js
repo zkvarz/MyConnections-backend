@@ -5,6 +5,11 @@ var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 
+var constants = require("./constants");
+var passport = require('passport');
+var Strategy = require('passport-local').Strategy;
+var JsonStrategy = require('passport-json').Strategy;
+
 var routes = require('./routes/index');
 var users = require('./routes/users');
 var account = require('./routes/account');
@@ -17,10 +22,55 @@ var assert = require("assert");
 var databaseUrl = 'mongodb://localhost:27017/myconnections-backend';
 MongoClient.connect(databaseUrl, function(err, db) {
   assert.equal(err);
+  if(err) console.log("Error occured: " + err);
   console.log("Connected correctly to server");
-
-  db.close();
+// db.close();
+initPassportStrategy(db);
 });
+
+
+//AUTHORIZATION PASSPORT STRATEGY =====================
+function initPassportStrategy(db) {
+
+  passport.use(new JsonStrategy({
+      usernameProp: 'phone',
+      passwordProp: 'password',
+
+    },
+    function(phone, password, done) {
+      console.log("Check username & password! Search for: username " + phone + " pass " + password);
+      db.collection(constants.USERS).findOne({
+        "phone": phone
+      }, function(err, user) {
+        if (err) {
+          console.log("User not found");
+          return done(err);
+        }
+        if (!user) {
+          return done(null, false);
+        }
+
+        if (user.phone == phone && user.password == password) {
+          console.log("User found! " + phone);
+          console.log("phone" + user.phone);
+          console.log("user" + user.password);
+        }
+        else {
+          console.log("User Not found! " + phone);
+        }
+
+        //no password verification yet
+        // if (!user.verifyPassword(password)) { return done(null, false); }
+        return done(null, user);
+      });
+    }
+  ));
+
+  console.log("Connecting to db again.");
+
+}
+
+//========================================================
 
 var app = express();
 
@@ -28,13 +78,43 @@ var app = express();
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
 
+// FOR LOGIN POST ===============================================================
+
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
-app.use(logger('dev'));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
+
+// Use application-level middleware for common functionality, including
+// logging, parsing, and session handling.
+app.use(require('morgan')('combined'));
+app.use(require('cookie-parser')());
+app.use(require('body-parser').urlencoded({ extended: true }));
+app.use(require('express-session')({ secret: 'keyboard cat', resave: false, saveUninitialized: false }));
+
+// Initialize Passport and restore authentication state, if any, from the
+// session.
+app.use(passport.initialize());
+app.use(passport.session());
+
+app.use(bodyParser.json());  
+
+// Define routes.
+app.get('/login',
+  function(req, res){
+    console.log("/login get triggered");
+    // res.render('login');
+    res.end("Credentials incorrect! Please, try again.");
+  });
+  
+app.post('/login', 
+  // passport.authenticate('local', { failureRedirect: '/login' }),
+  passport.authenticate('json', { failureRedirect: '/login', session: false }),
+  function(req, res) {
+    console.log("/login post triggered");
+    // res.redirect('/');
+    res.end("token should be there");
+  });
+
+//====================================================================
 
 app.use('/', routes);
 app.use('/users', users);

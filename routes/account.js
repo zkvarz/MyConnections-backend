@@ -2,6 +2,8 @@ var express = require('express');
 var router = express.Router();
 var constants = require("../constants");
 var assert = require('assert');
+var jwt = require('jwt-simple');
+// var app = require("../app");
 
 /* POST account. */
 router.post('/create', function(req, res, next) {
@@ -73,10 +75,46 @@ router.post('/create', function(req, res, next) {
 });
 
 /* GET users. */
-router.get('/getUsers', function(req, res, next) {
+router.post('/getUsers', function(req, res, next) {
     // if (!isHeaderValid(req, res)) return res.sendStatus(400);
+    
+    //allow the client to attach a token in one of three ways – as a query 
+    //string parameter, a form body parameter, or in an HTTP header
+    console.log("req: " + req.body)
+    console.log("req.body.token: " + req.body.token)
+    var token = (req.body && req.body.token) || (req.query && req.query.token) || req.headers['x-access-token'];
+    
+    console.log("global.app.get('jwtTokenSecret') " + global.app.get('jwtTokenSecret'));
+    
+    if (token) {
+        try {
+            var decoded = jwt.decode(token, global.app.get('jwtTokenSecret'));
 
-    var findUsers = function(db, callback) {
+            // handle token here
+            console.log("handle token here");
+            console.log("decoded.exp: " + decoded.exp);
+            console.log("Date.now(): " + new Date().getTime()/1000);
+
+            if (decoded.exp <= new Date().getTime()/1000) {
+                res.end('Access token has expired', 400);
+            } else {
+                res.end("It's Okay");
+            }
+            
+        }
+        catch (err) {
+             console.log("Eror! " + err);
+            return next();
+        }
+    }
+    else {
+        console.log("TOKEN NOT FOUND")
+        next();
+    }
+    
+     console.log("account: global.db exists? " + global.db);
+
+/*    var findUsers = function(db, callback) {
         var jsonString = "";
 
         var cursor = db.collection(constants.USERS).find();
@@ -96,11 +134,10 @@ router.get('/getUsers', function(req, res, next) {
 
     };
 
-    console.log("account: global.db exists? " + global.db);
 
     findUsers(global.db, function() {
         console.log("findUsers finish");
-    });
+    });*/
 
 });
 

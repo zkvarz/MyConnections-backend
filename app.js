@@ -8,6 +8,7 @@ var bodyParser = require('body-parser');
 var constants = require("./constants");
 var passport = require('passport');
 var JsonStrategy = require('passport-json').Strategy;
+var jwt = require('jwt-simple');
 
 var routes = require('./routes/index');
 var users = require('./routes/users');
@@ -17,6 +18,9 @@ var account = require('./routes/account');
 var MongoClient = require('mongodb').MongoClient;
 var assert = require("assert");
 var db;
+
+// current time + 15days, seconds
+var tokenTimeExpired = Math.round(new Date().getTime() / 1000) + 1296000;
 
 //database connection
 var databaseUrl = 'mongodb://localhost:27017/myconnections-backend';
@@ -60,14 +64,10 @@ function initPassportStrategy() {
           console.log("User Not found! " + phone);
         }
 
-        //no password verification yet
-        // if (!user.verifyPassword(password)) { return done(null, false); }
         return done(null, user);
       });
     }
   ));
-
-  console.log("Connecting to db again.");
 
 }
 
@@ -78,6 +78,7 @@ var app = express();
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
+app.set('jwtTokenSecret', 'my-super-secret');
 
 // FOR LOGIN POST ===============================================================
 
@@ -105,12 +106,48 @@ app.get('/login',
     res.sendStatus(400);
   });
   
-app.post('/login', 
-  passport.authenticate('json', { failureRedirect: '/login', session: false }),
-  function(req, res) {
-    console.log("/login post triggered");
-    res.end("token should be there");
-  });
+app.post('/login', function(req, res, next) {
+   console.log("/login post triggered");
+   
+  passport.authenticate('json', {
+      failureRedirect: '/login',
+      session: false
+    },
+    function(err, user, info) {
+      if (err) {
+        return next(err);
+      }
+      if (!user) {
+        return res.status(401).json({
+          error: 'Incorrect credentials!'
+        });
+      }
+      
+      // var expires = moment().add('days', 7).valueOf();
+      var token = jwt.encode({
+        iss: user.id,
+        exp: tokenTimeExpired
+      }, app.get('jwtTokenSecret'));
+
+      res.json({
+        token: token,
+        expires: tokenTimeExpired,
+        user: {phone: user.phone, id: user._id}
+      });
+      
+  //old implementation
+ /*     var tokenSecret = "xxx";
+      //user has authenticated correctly thus we create a JWT token 
+      var token = jwt.encode({
+        username: user.phone
+      }, tokenSecret);
+      res.json({
+        token: token
+      });*/
+
+    })(req, res, next);
+
+});
 
 //====================================================================
 
@@ -154,3 +191,4 @@ module.exports = app;
 
 global.db = db;
 global.databaseUrl = databaseUrl;
+global.app = app;

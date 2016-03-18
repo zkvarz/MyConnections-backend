@@ -7,7 +7,6 @@ var bodyParser = require('body-parser');
 
 var constants = require("./constants");
 var passport = require('passport');
-var Strategy = require('passport-local').Strategy;
 var JsonStrategy = require('passport-json').Strategy;
 
 var routes = require('./routes/index');
@@ -17,20 +16,22 @@ var account = require('./routes/account');
 //mongodb database
 var MongoClient = require('mongodb').MongoClient;
 var assert = require("assert");
+var db;
 
 //database connection
 var databaseUrl = 'mongodb://localhost:27017/myconnections-backend';
-MongoClient.connect(databaseUrl, function(err, db) {
+MongoClient.connect(databaseUrl, function(err, database) {
   assert.equal(err);
-  if(err) console.log("Error occured: " + err);
+  if (err) console.log("Error in database connect occured: " + err);
   console.log("Connected correctly to server");
-// db.close();
-initPassportStrategy(db);
+  this.db = database;
+  console.log("global.db exists? " + global.db);
+  initPassportStrategy();
 });
 
 
 //AUTHORIZATION PASSPORT STRATEGY =====================
-function initPassportStrategy(db) {
+function initPassportStrategy() {
 
   passport.use(new JsonStrategy({
       usernameProp: 'phone',
@@ -39,7 +40,7 @@ function initPassportStrategy(db) {
     },
     function(phone, password, done) {
       console.log("Check username & password! Search for: username " + phone + " pass " + password);
-      db.collection(constants.USERS).findOne({
+      global.db.collection(constants.USERS).findOne({
         "phone": phone
       }, function(err, user) {
         if (err) {
@@ -47,7 +48,7 @@ function initPassportStrategy(db) {
           return done(err);
         }
         if (!user) {
-          return done(null, false);
+          return done(null, false, { message: 'Incorrect credentials!' });
         }
 
         if (user.phone == phone && user.password == password) {
@@ -100,17 +101,14 @@ app.use(bodyParser.json());
 // Define routes.
 app.get('/login',
   function(req, res){
-    console.log("/login get triggered");
-    // res.render('login');
-    res.end("Credentials incorrect! Please, try again.");
+    console.log("/login get triggered!");
+    res.sendStatus(400);
   });
   
 app.post('/login', 
-  // passport.authenticate('local', { failureRedirect: '/login' }),
   passport.authenticate('json', { failureRedirect: '/login', session: false }),
   function(req, res) {
     console.log("/login post triggered");
-    // res.redirect('/');
     res.end("token should be there");
   });
 
@@ -154,5 +152,5 @@ app.use(function(err, req, res, next) {
 
 module.exports = app;
 
-global.mongoclient = MongoClient;
+global.db = db;
 global.databaseUrl = databaseUrl;

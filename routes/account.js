@@ -3,10 +3,6 @@ var router = express.Router();
 var constants = require("../constants");
 var assert = require('assert');
 
-// var users = "users";
-// var phone = "phone";
-// var password = "password";
-
 /* POST account. */
 router.post('/create', function(req, res, next) {
 
@@ -18,68 +14,56 @@ router.post('/create', function(req, res, next) {
     // check phone & password
     if (phoneString && passwordString) {
 
-        global.mongoclient.connect(global.databaseUrl, function(err, db) {
-            assert.equal(null, err);
-            
-            createIndex(db, function(collection) {
-                console.log("user insertion " + collection)
-                collection.ensureIndex({
-                    "phone": 1
-                }, {
-                    unique: true
-                }, function(err, indexName) {
-                    if (err) {
-                        console.log(err)
-                        return;
-                    }
+        // Get the documents collection
+        var collection = global.db.collection(constants.USERS);
+        collection.createIndex({
+                "phone": 1
+            }, {
+                unique: true
+            },
+            // null,
+            function(err, results) {
+                if (err) console.log(err)
+                assert.equal(err, null);
+                console.log("user createIndex")
+                console.log(results);
 
-                    // Insert user document
-                    collection.insertOne({
-                        phone: phoneString,
-                        password: passwordString
-                    }, function(err, result) {
-                        if (err) {
-                            console.log("Duplicate key!");
-                            console.log(err)
-                            db.close();
-                            res.writeHead(400, {
-                                'Content-Type': 'text/plain'
-                            });
-                            //  res.end('ok');
-                            return res.end("Sorry, user already exists.");
-                        }
-                        else {
-                            db.close();
-                            console.log("Inserted a document into the users collection.");
-                            return res.sendStatus(200);
-                        }
-                    });
+                insertUser(global.db, collection);
+            }
+        );
+
+        var insertUser = function(db, collection) {
+            console.log("user insertion " + collection)
+            collection.ensureIndex({
+                "phone": 1
+            }, {
+                unique: true
+            }, function(err, indexName) {
+                if (err) {
+                    console.log(err)
+                    return;
+                }
+
+                // Insert user document
+                collection.insertOne({
+                    phone: phoneString,
+                    password: passwordString
+                }, function(err, result) {
+                    if (err) {
+                        console.log("Duplicate key!");
+                        console.log(err)
+                        res.writeHead(400, {
+                            'Content-Type': 'text/plain'
+                        });
+                        return res.end("Sorry, user already exists.");
+                    }
+                    else {
+                        console.log("Inserted a document into the users collection.");
+                        return res.sendStatus(200);
+                    }
                 });
             });
-        });
-
-        var createIndex = function(db, callback) {
-            // Get the documents collection
-            var collection = db.collection(constants.USERS);
-
-            collection.createIndex({
-                    "phone": 1
-                }, {
-                    unique: true
-                },
-                // null,
-                function(err, results) {
-                    if (err) console.log(err)
-                        // assert.equal(err, null);
-                    console.log("user createIndex")
-                    console.log(results);
-
-                    callback(collection);
-
-                }
-            );
-        }
-
+        };
 
     }
     else {
@@ -105,7 +89,6 @@ router.get('/getUsers', function(req, res, next) {
                 console.log(jsonString);
             }
             else {
-                console.log("No Users Found");
                 res.end(jsonString);
                 callback();
             }
@@ -113,11 +96,10 @@ router.get('/getUsers', function(req, res, next) {
 
     };
 
-    global.mongoclient.connect(global.databaseUrl, function(err, db) {
-        assert.equal(null, err);
-        findUsers(db, function() {
-            db.close();
-        });
+    console.log("account: global.db exists? " + global.db);
+
+    findUsers(global.db, function() {
+        console.log("findUsers finish");
     });
 
 });

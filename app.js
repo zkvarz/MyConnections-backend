@@ -19,8 +19,6 @@ var MongoClient = require('mongodb').MongoClient;
 var assert = require("assert");
 var db;
 
-// current time + 15days, seconds
-var tokenTimeExpired = Math.round(new Date().getTime() / 1000) + 1296000;
 
 //database connection
 var databaseUrl = 'mongodb://localhost:27017/myconnections-backend';
@@ -123,9 +121,11 @@ app.post('/login', function(req, res, next) {
         });
       }
       
-      // var expires = moment().add('days', 7).valueOf();
+      // current time + 15days, 1296000 seconds
+      var tokenTimeExpired = Math.round(new Date().getTime() / 1000) + 1296000;
+      
       var token = jwt.encode({
-        iss: user.id,
+        id: user._id,
         exp: tokenTimeExpired
       }, app.get('jwtTokenSecret'));
 

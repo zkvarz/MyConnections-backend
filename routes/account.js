@@ -88,23 +88,27 @@ router.post('/getUsers', function(req, res, next) {
     
     if (token) {
         try {
+            console.log("Decoding token...");
             var decoded = jwt.decode(token, global.app.get('jwtTokenSecret'));
 
             // handle token here
             console.log("handle token here");
             console.log("decoded.exp: " + decoded.exp);
+            // console.log("decoded.user.id: " + decoded.user.id);
             console.log("Date.now(): " + new Date().getTime()/1000);
 
-            if (decoded.exp <= new Date().getTime()/1000) {
+           if (decoded.exp <= new Date().getTime()/1000) {
                 res.end('Access token has expired', 400);
             } else {
-                res.end("It's Okay");
+                findUsers();
+                console.log("user id: " + decoded.id);
             }
-            
         }
         catch (err) {
              console.log("Eror! " + err);
-            return next();
+             res.statusCode = 401;
+             res.end('Authorization error!');
+            //  return next();
         }
     }
     else {
@@ -114,30 +118,26 @@ router.post('/getUsers', function(req, res, next) {
     
      console.log("account: global.db exists? " + global.db);
 
-/*    var findUsers = function(db, callback) {
-        var jsonString = "";
+     function findUsers() {
+         var jsonString = "";
 
-        var cursor = db.collection(constants.USERS).find();
-        cursor.each(function(err, doc) {
-            assert.equal(err, null);
-            if (doc != null) {
-                console.dir(doc);
+         var cursor = global.db.collection(constants.USERS).find();
+         cursor.each(function(err, doc) {
+             assert.equal(err, null);
+             if (doc != null) {
+                 console.dir(doc);
 
-                jsonString += JSON.stringify(doc);
-                console.log(jsonString);
-            }
-            else {
-                res.end(jsonString);
-                callback();
-            }
-        });
+                 jsonString += JSON.stringify(doc);
+                 console.log(jsonString);
+             }
+             else {
+                 res.end(jsonString);
+                 //   callback();
+             }
+         });
+     };
+     
 
-    };
-
-
-    findUsers(global.db, function() {
-        console.log("findUsers finish");
-    });*/
 
 });
 

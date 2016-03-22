@@ -21,7 +21,8 @@ router.post('/create', function(req, res, next) {
         collection.createIndex({
                 "phone": 1
             }, {
-                unique: true
+                unique: true,
+                sparse: true
             },
             // null,
             function(err, results) {
@@ -73,6 +74,65 @@ router.post('/create', function(req, res, next) {
     }
 
 });
+
+/* FACEBOOK LOGIN  */
+router.post("/facebookLogin", function(req, res, next) {
+    if (!isHeaderValid(req, res)) return res.sendStatus(400);
+
+    var facebookId = req.body.id;
+    var facebookToken = req.body.token;
+
+    if (facebookId && facebookToken) {
+        // Get the documents collection
+        var collection = global.db.collection(constants.USERS);
+        collection.createIndex({
+                "phone": 1,
+                "facebookId": 1
+            }, {
+                unique: true,
+                sparse: true
+            },
+            // null,
+            function(err, results) {
+                if (err) console.log(err)
+                assert.equal(err, null);
+                console.log("user createIndex")
+                console.log(results);
+
+                insertUser(global.db, collection);
+            }
+        );
+
+        var insertUser = function(db, collection) {
+            console.log("user insertion " + collection)
+
+                // Insert user document
+                collection.insertOne({
+                    social: "facebook",
+                    facebookId: facebookId, 
+                    token: facebookToken
+                }, function(err, result) {
+                    if (err) {
+                        console.log("Duplicate key!");
+                        console.log(err)
+                        res.writeHead(400, {
+                            'Content-Type': 'text/plain'
+                        });
+                        return res.end(JSON.stringify({error: "Sorry, user already exists."}));
+                    }
+                    else {
+                        console.log("Inserted a document into the users collection.");
+                        console.log({"facebookId":facebookId, social: "facebook", token: facebookToken});
+                        return res.end(JSON.stringify({"facebookId":facebookId, social: "facebook", token: facebookToken}));
+                        
+                    }
+                });
+        };
+    }
+    else {
+        return res.sendStatus(400);
+    }
+})
 
 /* GET users. */
 router.post('/getUsers', function(req, res, next) {

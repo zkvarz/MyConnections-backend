@@ -24,7 +24,6 @@ router.post('/create', function(req, res, next) {
                 unique: true,
                 sparse: true
             },
-            // null,
             function(err, results) {
                 if (err) console.log(err)
                 assert.equal(err, null);
@@ -80,53 +79,91 @@ router.post("/facebookLogin", function(req, res, next) {
     if (!isHeaderValid(req, res)) return res.sendStatus(400);
 
     var facebookId = req.body.id;
-    var facebookToken = req.body.token;
+    var facebookToken = req.body.facebookToken;
 
     if (facebookId && facebookToken) {
         // Get the documents collection
-        var collection = global.db.collection(constants.USERS);
-        collection.createIndex({
+        var users = global.db.collection(constants.USERS);
+        users.createIndex({
                 "phone": 1,
                 "facebookId": 1
             }, {
                 unique: true,
                 sparse: true
             },
-            // null,
             function(err, results) {
                 if (err) console.log(err)
                 assert.equal(err, null);
                 console.log("user createIndex")
                 console.log(results);
 
-                insertUser(global.db, collection);
+                // insertUser(global.db, users);
+                findFacebookUser(global.db, users);
             }
         );
 
-        var insertUser = function(db, collection) {
-            console.log("user insertion " + collection)
-
-                // Insert user document
-                collection.insertOne({
-                    social: "facebook",
-                    facebookId: facebookId, 
-                    token: facebookToken
-                }, function(err, result) {
-                    if (err) {
-                        console.log("Duplicate key!");
-                        console.log(err)
-                        res.writeHead(400, {
-                            'Content-Type': 'text/plain'
-                        });
-                        return res.end(JSON.stringify({error: "Sorry, user already exists."}));
-                    }
+        var findFacebookUser = function(db, users) {
+            users.findOne({
+                facebookId: facebookId
+            }, function(err, document) {
+                if (err)
+                    console.log(err)
+                else {
+                    if (!document)
+                        insertUser(global.db, users);
                     else {
-                        console.log("Inserted a document into the users collection.");
-                        console.log({"facebookId":facebookId, social: "facebook", token: facebookToken});
-                        return res.end(JSON.stringify({"facebookId":facebookId, social: "facebook", token: facebookToken}));
-                        
+                        console.log("document found! " + document.facebookId);
+                        console.log({
+                            "facebookId": facebookId,
+                            phone: document.phone,
+                            social: "facebook",
+                            facebookToken: facebookToken
+                        });
+                        return res.end(JSON.stringify({
+                            "facebookId": facebookId,
+                            phone: document.phone,
+                            social: "facebook",
+                            facebookToken: facebookToken
+                        }));
                     }
-                });
+                }
+            });
+        }
+
+        var insertUser = function(db, users) {
+            console.log("user insertion " + users)
+
+            // Insert user document
+            users.insertOne({
+                social: "facebook",
+                facebookId: facebookId,
+                facebookToken: facebookToken
+            }, function(err, result) {
+                if (err) {
+                    console.log("Sorry, facebook login error!");
+                    console.log(err)
+                    res.writeHead(400, {
+                        'Content-Type': 'text/plain'
+                    });
+                    return res.end(JSON.stringify({
+                        error: "Sorry, facebook login error."
+                    }));
+                }
+                else {
+                    console.log("Inserted a document into the users collection.");
+                    console.log({
+                        "facebookId": facebookId,
+                        social: "facebook",
+                        facebookToken: facebookToken
+                    });
+                    return res.end(JSON.stringify({
+                        "facebookId": facebookId,
+                        social: "facebook",
+                        facebookToken: facebookToken
+                    }));
+
+                }
+            });
         };
     }
     else {
@@ -134,18 +171,27 @@ router.post("/facebookLogin", function(req, res, next) {
     }
 })
 
+/* FACEBOOK LOGIN  */
+router.post("/facebookUpdate", function(req, res, next) {
+    if (!isHeaderValid(req, res)) return res.sendStatus(400);
+
+    var facebookId = req.body.id;
+    var facebookToken = req.body.token;
+    res.end("Yep!");
+})
+
 /* GET users. */
 router.post('/getUsers', function(req, res, next) {
     // if (!isHeaderValid(req, res)) return res.sendStatus(400);
-    
+
     //allow the client to attach a token in one of three ways – as a query 
     //string parameter, a form body parameter, or in an HTTP header
     console.log("req: " + req.body)
     console.log("req.body.token: " + req.body.token)
     var token = (req.body && req.body.token) || (req.query && req.query.token) || req.headers['x-access-token'];
-    
+
     console.log("global.app.get('jwtTokenSecret') " + global.app.get('jwtTokenSecret'));
-    
+
     if (token) {
         try {
             console.log("Decoding token...");
@@ -155,19 +201,20 @@ router.post('/getUsers', function(req, res, next) {
             console.log("handle token here");
             console.log("decoded.exp: " + decoded.exp);
             // console.log("decoded.user.id: " + decoded.user.id);
-            console.log("Date.now(): " + new Date().getTime()/1000);
+            console.log("Date.now(): " + new Date().getTime() / 1000);
 
-           if (decoded.exp <= new Date().getTime()/1000) {
+            if (decoded.exp <= new Date().getTime() / 1000) {
                 res.end('Access token has expired', 400);
-            } else {
+            }
+            else {
                 findUsers();
                 console.log("user id: " + decoded.id);
             }
         }
         catch (err) {
-             console.log("Eror! " + err);
-             res.statusCode = 401;
-             res.end('Authorization error!');
+            console.log("Eror! " + err);
+            res.statusCode = 401;
+            res.end('Authorization error!');
             //  return next();
         }
     }
@@ -175,28 +222,28 @@ router.post('/getUsers', function(req, res, next) {
         console.log("TOKEN NOT FOUND")
         next();
     }
-    
-     console.log("account: global.db exists? " + global.db);
 
-     function findUsers() {
-         var jsonString = "";
+    console.log("account: global.db exists? " + global.db);
 
-         var cursor = global.db.collection(constants.USERS).find();
-         cursor.each(function(err, doc) {
-             assert.equal(err, null);
-             if (doc != null) {
-                 console.dir(doc);
+    function findUsers() {
+        var jsonString = "";
 
-                 jsonString += JSON.stringify(doc);
-                 console.log(jsonString);
-             }
-             else {
-                 res.end(jsonString);
-                 //   callback();
-             }
-         });
-     };
-     
+        var cursor = global.db.collection(constants.USERS).find();
+        cursor.each(function(err, doc) {
+            assert.equal(err, null);
+            if (doc != null) {
+                console.dir(doc);
+
+                jsonString += JSON.stringify(doc);
+                console.log(jsonString);
+            }
+            else {
+                res.end(jsonString);
+                //   callback();
+            }
+        });
+    };
+
 
 
 });

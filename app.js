@@ -8,7 +8,6 @@ var bodyParser = require('body-parser');
 var constants = require("./constants");
 var passport = require('passport');
 var JsonStrategy = require('passport-json').Strategy;
-var jwt = require('jwt-simple');
 
 var routes = require('./routes/index');
 var users = require('./routes/users');
@@ -19,7 +18,6 @@ var MongoClient = require('mongodb').MongoClient;
 var assert = require("assert");
 var db;
 
-
 //database connection
 var databaseUrl = 'mongodb://localhost:27017/myconnections-backend';
 MongoClient.connect(databaseUrl, function(err, database) {
@@ -29,16 +27,16 @@ MongoClient.connect(databaseUrl, function(err, database) {
   this.db = database;
   console.log("global.db exists? " + global.db);
   initPassportStrategy();
+  initFacebookPassportStrategy();
 });
 
 
 //AUTHORIZATION PASSPORT STRATEGY =====================
 function initPassportStrategy() {
 
-  passport.use(new JsonStrategy({
+  passport.use('user-login', new JsonStrategy({
       usernameProp: 'phone',
       passwordProp: 'password',
-
     },
     function(phone, password, done) {
       console.log("Check username & password! Search for: username " + phone + " pass " + password);
@@ -50,7 +48,9 @@ function initPassportStrategy() {
           return done(err);
         }
         if (!user) {
-          return done(null, false, { message: 'Incorrect credentials!' });
+          return done(null, false, {
+            message: 'Incorrect credentials!'
+          });
         }
 
         if (user.phone == phone && user.password == password) {
@@ -60,6 +60,46 @@ function initPassportStrategy() {
         }
         else {
           console.log("User Not found! " + phone);
+        }
+
+        return done(null, user);
+      });
+    }
+  ));
+
+}
+
+//========================================================
+
+//AUTHORIZATION FACEBOOK PASSPORT STRATEGY =====================
+function initFacebookPassportStrategy() {
+  console.log("initFacebookPassportStrategy");
+
+  console.log("PASSPORT init: " + passport);
+
+  passport.use('facebook-login', new JsonStrategy(
+    function(facebookId, password, done) {
+      console.log("Check facebook username & password! Search for: username " + facebookId);
+      global.db.collection(constants.USERS).findOne({
+        facebookId: facebookId
+      }, function(err, user) {
+        if (err) {
+          console.log("User not found");
+          return done(err);
+        }
+        if (!user) {
+           console.log("Incorrect !USER facebook.");
+          return done(null, false, {
+            message: 'Incorrect credentials!'
+          });
+        }
+
+        if (user.facebookId == facebookId) {
+          console.log("User found! " + facebookId);
+          console.log("facebookId! " + user.facebookId);
+        }
+        else {
+          console.log("User Not found! " + facebookId);
         }
 
         return done(null, user);
@@ -87,67 +127,30 @@ app.set('jwtTokenSecret', 'my-super-secret');
 // logging, parsing, and session handling.
 app.use(require('morgan')('combined'));
 app.use(require('cookie-parser')());
-app.use(require('body-parser').urlencoded({ extended: true }));
-app.use(require('express-session')({ secret: 'keyboard cat', resave: false, saveUninitialized: false }));
+app.use(require('body-parser').urlencoded({
+  extended: true
+}));
+app.use(require('express-session')({
+  secret: 'keyboard cat',
+  resave: false,
+  saveUninitialized: false
+}));
 
 // Initialize Passport and restore authentication state, if any, from the
 // session.
 app.use(passport.initialize());
 app.use(passport.session());
 
-app.use(bodyParser.json());  
+app.use(bodyParser.json());
 
 // Define routes.
 app.get('/login',
-  function(req, res){
+  function(req, res) {
     console.log("/login get triggered!");
     res.sendStatus(400);
   });
-  
-app.post('/login', function(req, res, next) {
-   console.log("/login post triggered");
-   
-  passport.authenticate('json', {
-      failureRedirect: '/login',
-      session: false
-    },
-    function(err, user, info) {
-      if (err) {
-        return next(err);
-      }
-      if (!user) {
-        return res.status(401).json({
-          error: 'Incorrect credentials!'
-        });
-      }
-      
-      // current time + 15days, 1296000 seconds
-      var tokenTimeExpired = Math.round(new Date().getTime() / 1000) + 1296000;
-      
-      var token = jwt.encode({
-        id: user._id,
-        exp: tokenTimeExpired
-      }, app.get('jwtTokenSecret'));
 
-      res.json({
-        token: token,
-        expires: tokenTimeExpired,
-        user: {phone: user.phone, id: user._id}
-      });
-      
-  //old implementation
- /*     var tokenSecret = "xxx";
-      //user has authenticated correctly thus we create a JWT token 
-      var token = jwt.encode({
-        username: user.phone
-      }, tokenSecret);
-      res.json({
-        token: token
-      });*/
 
-    })(req, res, next);
-
-});
 
 //====================================================================
 

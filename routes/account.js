@@ -3,9 +3,14 @@ var router = express.Router();
 var constants = require("../constants");
 var assert = require('assert');
 var jwt = require('jwt-simple');
-// var app = require("../app");
 
-/* POST account. */
+var mongo = require('mongodb');
+
+var passport = require('passport');
+
+console.log("PASSPORT: " + passport);
+
+/* CREATE account. */
 router.post('/create', function(req, res, next) {
 
     if (!isHeaderValid(req, res)) return res.sendStatus(400);
@@ -45,7 +50,6 @@ router.post('/create', function(req, res, next) {
                     console.log(err)
                     return;
                 }
-
                 // Insert user document
                 collection.insertOne({
                     phone: phoneString,
@@ -66,13 +70,49 @@ router.post('/create', function(req, res, next) {
                 });
             });
         };
-
     }
     else {
         return res.sendStatus(400);
     }
 
 });
+
+/* USER LOGIN  */
+router.post('/login', function(req, res, next) {
+    console.log("/login post triggered");
+
+    passport.authenticate('user-login', {
+            failureRedirect: '/login',
+            session: false
+        },
+        function(err, user, info) {
+            if (err) {
+                return next(err);
+            }
+            if (!user) {
+                return res.status(401).json({
+                    error: 'Incorrect credentials!'
+                });
+            }
+            // current time + 15days, 1296000 seconds
+            var tokenTimeExpired = Math.round(new Date().getTime() / 1000) + 1296000;
+
+            var token = jwt.encode({
+                id: user._id,
+                exp: tokenTimeExpired
+            }, global.app.get('jwtTokenSecret'));
+
+            res.json({
+                token: token,
+                expires: tokenTimeExpired,
+                user: {
+                    phone: user.phone,
+                    id: user._id
+                }
+            });
+        })(req, res, next);
+});
+
 
 /* FACEBOOK LOGIN  */
 router.post("/facebookLogin", function(req, res, next) {
@@ -119,12 +159,8 @@ router.post("/facebookLogin", function(req, res, next) {
                             social: "facebook",
                             facebookToken: facebookToken
                         });
-                        return res.end(JSON.stringify({
-                            "facebookId": facebookId,
-                            phone: document.phone,
-                            social: "facebook",
-                            facebookToken: facebookToken
-                        }));
+                        console.log("DOCUMENT OBJECT" + document);
+                        facebookAuthorization(document);
                     }
                 }
             });
@@ -156,28 +192,112 @@ router.post("/facebookLogin", function(req, res, next) {
                         social: "facebook",
                         facebookToken: facebookToken
                     });
-                    return res.end(JSON.stringify({
-                        "facebookId": facebookId,
-                        social: "facebook",
-                        facebookToken: facebookToken
-                    }));
-
+                    findFacebookUser(global.db, users);
                 }
             });
         };
+
+        var facebookAuthorization = function(user) {
+            console.log("facebookAuthorization function");
+
+            // current time + 15days, 1296000 seconds
+            var tokenTimeExpired = Math.round(new Date().getTime() / 1000) + 1296000;
+
+            var token = jwt.encode({
+                id: user._id,
+                exp: tokenTimeExpired
+            }, global.app.get('jwtTokenSecret'));
+
+            return res.end(JSON.stringify({
+                user: {
+                    phone: user.phone,
+                    id: user._id
+                },
+                "facebookId": facebookId,
+                social: "facebook",
+                token: token,
+                expires: tokenTimeExpired,
+                facebookToken: facebookToken
+            }));
+        }
     }
     else {
         return res.sendStatus(400);
     }
 })
 
-/* FACEBOOK LOGIN  */
-router.post("/facebookUpdate", function(req, res, next) {
+/* USER UPDATE  */
+router.post("/updateUser", function(req, res, next) {
     if (!isHeaderValid(req, res)) return res.sendStatus(400);
 
-    var facebookId = req.body.id;
-    var facebookToken = req.body.token;
-    res.end("Yep!");
+    console.log("updateUser");
+
+    var token = req.body.token;
+    var phone = req.body.phone;
+    var facebookId = req.body.facebookId;
+
+    var users = global.db.collection(constants.USERS);
+
+    try {
+        console.log("Decoding token...");
+        var decoded = jwt.decode(token, global.app.get('jwtTokenSecret'));
+        console.log("user id! : " + decoded.id);
+
+        users.update({
+            "_id": new mongo.ObjectID(decoded.id)
+        }, {
+            $set: {
+                phone: req.body.phone
+            }
+        }, function(err, user) {
+            if (err) {
+                console.log(err)
+                res.end(JSON.stringify({
+                    "error": "Account with this number already exists!"
+                }));
+            }
+            else {
+                if (!user)
+                    console.log("Document not found");
+                else {
+                    console.log("UPDATE INFO" + user);
+                    findUser(global.db, users, decoded.id);
+                }
+            }
+        });
+
+        var findUser = function(db, users, id) {
+            users.findOne({
+                "_id": new mongo.ObjectID(id)
+            }, function(err, document) {
+                if (err)
+                    console.log(err)
+                else {
+                    if (!document)
+                        console.log("Document not found");
+                    else {
+                        console.log("document updated! " + document.facebookId);
+                        res.json({
+                            "facebookId": document.facebookId,
+                            phone: document.phone,
+                            social: document.social,
+                            facebookToken: document.facebookToken
+                        });
+                        //TEMP
+                        // res.end(JSON.stringify(document));
+                        console.log("DOCUMENT OBJECT" + document);
+                    }
+                }
+            });
+
+        }
+    }
+    catch (err) {
+        console.log("Eror! " + err);
+        res.statusCode = 401;
+        res.end('Authorization error!');
+    }
+
 })
 
 /* GET users. */
@@ -226,25 +346,14 @@ router.post('/getUsers', function(req, res, next) {
     console.log("account: global.db exists? " + global.db);
 
     function findUsers() {
-        var jsonString = "";
-
         var cursor = global.db.collection(constants.USERS).find();
-        cursor.each(function(err, doc) {
-            assert.equal(err, null);
-            if (doc != null) {
-                console.dir(doc);
-
-                jsonString += JSON.stringify(doc);
-                console.log(jsonString);
-            }
-            else {
-                res.end(jsonString);
-                //   callback();
-            }
+        cursor.toArray(function(err, docs) {
+            if (!err)
+                console.log("retrieved records:");
+            console.log(docs);
+            res.end(JSON.stringify(docs));
         });
     };
-
-
 
 });
 
@@ -256,5 +365,6 @@ function isHeaderValid(req, res) {
         isValid = false;
     return isValid;
 }
+
 
 module.exports = router;

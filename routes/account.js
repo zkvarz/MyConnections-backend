@@ -8,7 +8,6 @@ var mongo = require('mongodb');
 
 var passport = require('passport');
 
-console.log("PASSPORT: " + passport);
 
 /* CREATE account. */
 router.post('/create', function(req, res, next) {
@@ -105,10 +104,8 @@ router.post('/login', function(req, res, next) {
             res.json({
                 token: token,
                 expires: tokenTimeExpired,
-                user: {
-                    phone: user.phone,
-                    id: user._id
-                }
+                phone: user.phone,
+                id: user._id
             });
         })(req, res, next);
 });
@@ -137,7 +134,6 @@ router.post("/facebookLogin", function(req, res, next) {
                 console.log("user createIndex")
                 console.log(results);
 
-                // insertUser(global.db, users);
                 findFacebookUser(global.db, users);
             }
         );
@@ -209,10 +205,8 @@ router.post("/facebookLogin", function(req, res, next) {
             }, global.app.get('jwtTokenSecret'));
 
             return res.end(JSON.stringify({
-                user: {
-                    phone: user.phone,
-                    id: user._id
-                },
+                phone: user.phone,
+                id: user._id,
                 "facebookId": facebookId,
                 social: "facebook",
                 token: token,
@@ -283,8 +277,6 @@ router.post("/updateUser", function(req, res, next) {
                             social: document.social,
                             facebookToken: document.facebookToken
                         });
-                        //TEMP
-                        // res.end(JSON.stringify(document));
                         console.log("DOCUMENT OBJECT" + document);
                     }
                 }
@@ -318,9 +310,6 @@ router.post('/getUsers', function(req, res, next) {
             var decoded = jwt.decode(token, global.app.get('jwtTokenSecret'));
 
             // handle token here
-            console.log("handle token here");
-            console.log("decoded.exp: " + decoded.exp);
-            // console.log("decoded.user.id: " + decoded.user.id);
             console.log("Date.now(): " + new Date().getTime() / 1000);
 
             if (decoded.exp <= new Date().getTime() / 1000) {
@@ -335,7 +324,6 @@ router.post('/getUsers', function(req, res, next) {
             console.log("Eror! " + err);
             res.statusCode = 401;
             res.end('Authorization error!');
-            //  return next();
         }
     }
     else {

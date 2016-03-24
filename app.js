@@ -41,7 +41,8 @@ function initPassportStrategy() {
     function(phone, password, done) {
       console.log("Check username & password! Search for: username " + phone + " pass " + password);
       global.db.collection(constants.USERS).findOne({
-        "phone": phone
+        "phone": phone,
+         "password": password
       }, function(err, user) {
         if (err) {
           console.log("User not found");
@@ -75,8 +76,6 @@ function initPassportStrategy() {
 function initFacebookPassportStrategy() {
   console.log("initFacebookPassportStrategy");
 
-  console.log("PASSPORT init: " + passport);
-
   passport.use('facebook-login', new JsonStrategy(
     function(facebookId, password, done) {
       console.log("Check facebook username & password! Search for: username " + facebookId);
@@ -88,14 +87,13 @@ function initFacebookPassportStrategy() {
           return done(err);
         }
         if (!user) {
-           console.log("Incorrect !USER facebook.");
+          console.log("Incorrect !USER facebook.");
           return done(null, false, {
             message: 'Incorrect credentials!'
           });
         }
 
         if (user.facebookId == facebookId) {
-          console.log("User found! " + facebookId);
           console.log("facebookId! " + user.facebookId);
         }
         else {
@@ -151,7 +149,6 @@ app.get('/login',
   });
 
 
-
 //====================================================================
 
 app.use('/', routes);
@@ -165,7 +162,7 @@ app.use(function(req, res, next) {
   next(err);
 });
 
-// error handlers
+/* Error handlers */
 
 // development error handler
 // will print stacktrace

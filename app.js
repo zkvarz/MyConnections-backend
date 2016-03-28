@@ -8,6 +8,9 @@ var bodyParser = require('body-parser');
 var constants = require("./constants");
 var passport = require('passport');
 var JsonStrategy = require('passport-json').Strategy;
+var GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
+
+var auth = require('./auth');
 
 var routes = require('./routes/index');
 var users = require('./routes/users');
@@ -28,6 +31,7 @@ MongoClient.connect(databaseUrl, function(err, database) {
   console.log("global.db exists? " + global.db);
   initPassportStrategy();
   initFacebookPassportStrategy();
+  initGoogleLoginStrategy()
 });
 
 
@@ -42,7 +46,7 @@ function initPassportStrategy() {
       console.log("Check username & password! Search for: username " + phone + " pass " + password);
       global.db.collection(constants.USERS).findOne({
         "phone": phone,
-         "password": password
+        "password": password
       }, function(err, user) {
         if (err) {
           console.log("User not found");
@@ -109,6 +113,30 @@ function initFacebookPassportStrategy() {
 
 //========================================================
 
+//AUTHORIZATION GOOGLE STRATEGY =====================
+function initGoogleLoginStrategy() {
+  console.log("initGoogleLoginStrategy");
+  passport.use('google', new GoogleStrategy({
+      clientID: auth.googleAuth.clientID,
+      clientSecret: auth.googleAuth.clientSecret,
+      callbackURL: auth.googleAuth.callbackURL,
+    },
+    function(token, tokenSecret, profile, cb) {
+      console.log("Google tokenSecret " + tokenSecret);
+      console.log("Google Auth " + profile.id);
+      global.db.collection(constants.USERS).findOrCreate({
+        googleId: profile.id
+      }, function(err, user) {
+        console.log("Google Auth Done!");
+        return cb(err, user);
+      });
+    }
+  ));
+
+}
+
+//========================================================
+
 var app = express();
 
 // view engine setup
@@ -147,7 +175,7 @@ app.get('/login',
     console.log("/login get triggered!");
     res.sendStatus(400);
   });
-
+  
 
 //====================================================================
 

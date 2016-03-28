@@ -220,6 +220,24 @@ router.post("/facebookLogin", function(req, res, next) {
     }
 })
 
+
+router.get('/googleLogin', passport.authenticate('google', { scope: 
+    [ 'https://www.googleapis.com/auth/plus.login',
+    , 'https://www.googleapis.com/auth/plus.profile.emails.read' ]  }));
+
+router.post("/googleLogin/callback", function(req, res, next) {
+    // the callback after google has authenticated the user
+    passport.authenticate('google', {
+       uccessRedirect: '/index',
+        failureRedirect: '/index'
+    }),
+    function(req, res) {
+        // Successful authentication, redirect to your app. 
+        res.end("seccess!!!");
+    }(req, res, next);
+
+})
+
 /* USER UPDATE  */
 router.post("/updateUser", function(req, res, next) {
     if (!isHeaderValid(req, res)) return res.sendStatus(400);

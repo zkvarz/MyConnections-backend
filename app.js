@@ -15,6 +15,7 @@ var auth = require('./auth');
 var routes = require('./routes/index');
 var users = require('./routes/users');
 var account = require('./routes/account');
+var googleAuth = require('./routes/googleAuth');
 
 //mongodb database
 var MongoClient = require('mongodb').MongoClient;
@@ -116,7 +117,48 @@ function initFacebookPassportStrategy() {
 //AUTHORIZATION GOOGLE STRATEGY =====================
 function initGoogleLoginStrategy() {
   console.log("initGoogleLoginStrategy");
-  passport.use('google', new GoogleStrategy({
+
+  passport.use(new GoogleStrategy({
+      clientID: '356569675251-vcq1jmfqsiccvidtsap7nfckvama6228.apps.googleusercontent.com',
+      clientSecret: 'vIxsuxFBXAp4mLbnFNaEWjBU',
+      callbackURL: "http://myconnections-backend-zkvarz.c9users.io/account/googleLogin/callback"
+    },
+    function(accessToken, refreshToken, profile, cb) {
+      console.log("collection findOrCreate");
+      console.log("accessToken " + accessToken);
+      console.log("refreshToken " + refreshToken);
+
+      global.db.collection(constants.USERS).createIndex({
+          "googleId": 1
+        }, {
+          unique: true,
+          sparse: true
+        },
+        function(err, results) {
+          if (err) console.log(err)
+          assert.equal(err, null);
+          console.log("user createIndex")
+          console.log(results);
+
+          insertUser(profile);
+        }
+      );
+
+      var insertUser = function(profile) {
+         console.log("user createIndex " + profile.id);
+        global.db.collection(constants.USERS).insert({
+          googleId: profile.id
+        }, function(err, user) {
+          return cb(err, user);
+        });
+      }
+
+
+    }
+  ));
+
+
+  /*passport.use('google', new GoogleStrategy({
       clientID: auth.googleAuth.clientID,
       clientSecret: auth.googleAuth.clientSecret,
       callbackURL: auth.googleAuth.callbackURL,
@@ -132,7 +174,7 @@ function initGoogleLoginStrategy() {
       });
     }
   ));
-
+*/
 }
 
 //========================================================
@@ -175,13 +217,14 @@ app.get('/login',
     console.log("/login get triggered!");
     res.sendStatus(400);
   });
-  
+
 
 //====================================================================
 
 app.use('/', routes);
 app.use('/users', users);
 app.use('/account', account);
+app.use('/googleAuth', googleAuth);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

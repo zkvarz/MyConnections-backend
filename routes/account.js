@@ -220,8 +220,21 @@ router.post("/facebookLogin", function(req, res, next) {
     }
 })
 
+router.get('/googleLogin', passport.authenticate('google', { scope : ['profile', 'email'] }));
 
-router.get('/googleLogin', passport.authenticate('google', { scope: 
+/*router.get('/googleLogin',
+  passport.authenticate('google', { scope: ['profile'] }));*/
+
+router.get('/googleLogin/callback', 
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  function(req, res) {
+    // Successful authentication, redirect home.
+    console.log("Google Login Success!");
+    res.redirect('/');
+  });
+
+
+/*router.get('/googleLogin', passport.authenticate('google', { scope: 
     [ 'https://www.googleapis.com/auth/plus.login',
     , 'https://www.googleapis.com/auth/plus.profile.emails.read' ]  }));
 
@@ -236,7 +249,7 @@ router.post("/googleLogin/callback", function(req, res, next) {
         res.end("seccess!!!");
     }(req, res, next);
 
-})
+})*/
 
 /* USER UPDATE  */
 router.post("/updateUser", function(req, res, next) {

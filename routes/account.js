@@ -8,6 +8,8 @@ var mongo = require('mongodb');
 
 var passport = require('passport');
 
+var configAuth = require('../auth');
+
 
 /* CREATE account. */
 router.post('/create', function(req, res, next) {
@@ -220,36 +222,54 @@ router.post("/facebookLogin", function(req, res, next) {
     }
 })
 
-router.get('/googleLogin', passport.authenticate('google', { scope : ['profile', 'email'] }));
 
-/*router.get('/googleLogin',
-  passport.authenticate('google', { scope: ['profile'] }));*/
+// We need this to build our post string
+var querystring = require('querystring');
+var http = require('http');
 
-router.get('/googleLogin/callback', 
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  function(req, res) {
-    // Successful authentication, redirect home.
-    console.log("Google Login Success!");
-    res.redirect('/');
-  });
+/* GOOGLE LOGIN */
+router.post('/googleLogin', function(req, res, next) {
+    if (!isHeaderValid(req, res)) return res.sendStatus(400);
+
+    var idToken = req.body.idToken;
+    if (idToken) {
+        verifyGoogleTokenId(idToken);
+    }
+    else {
+        res.sendStatus(400);
+    }
 
 
-/*router.get('/googleLogin', passport.authenticate('google', { scope: 
-    [ 'https://www.googleapis.com/auth/plus.login',
-    , 'https://www.googleapis.com/auth/plus.profile.emails.read' ]  }));
+    function verifyGoogleTokenId(tokenId) {
 
-router.post("/googleLogin/callback", function(req, res, next) {
-    // the callback after google has authenticated the user
-    passport.authenticate('google', {
-       uccessRedirect: '/index',
-        failureRedirect: '/index'
-    }),
-    function(req, res) {
-        // Successful authentication, redirect to your app. 
-        res.end("seccess!!!");
-    }(req, res, next);
+        // var tokenId = 'eyJhbGciOiJSUzI1NiIsImtpZCI6IjA3YjlhZDg5ZWFhMTQxNWM1NzA3Y2ZkNWViMDU4ZGJmOWIwOTY4NTkifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiIzNTY1Njk2NzUyNTEtdmNxMWptZnFzaWNjdmlkdHNhcDduZmNrdmFtYTYyMjguYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDIxMTQ5MDk2OTQ2NzIwNDk5OTQiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiYXpwIjoiMzU2NTY5Njc1MjUxLW8yZHNuam43bTA3OGcwMWwxNjg5YTkxYzFxa29zdWJxLmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29tIiwiZW1haWwiOiJ6a3ZhcnpAZ21haWwuY29tIiwiaWF0IjoxNDU5MzYzNDk5LCJleHAiOjE0NTkzNjcwOTksIm5hbWUiOiJLaXJpbGwgVmFyaXZvZGEiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDQuZ29vZ2xldXNlcmNvbnRlbnQuY29tLy1KYVNqSjBWa0lrNC9BQUFBQUFBQUFBSS9BQUFBQUFBQUFFby9FRXUzdWJrd0Y1Yy9zOTYtYy9waG90by5qcGciLCJnaXZlbl9uYW1lIjoiS2lyaWxsIiwiZmFtaWx5X25hbWUiOiJWYXJpdm9kYSIsImxvY2FsZSI6InJ1In0.M4C6EuEseb3XTWdPrQ2_GuogaiJm6Q1xKJYhL6oRS0QWzpdpZB13NJ1_2lvAadwEJtS0WpgEZ4AVXf31pyZl494iYj6ujcsGVo-K6hxyeljsegIeQ9m9a6njpQreA_NYWtY-xMKLEVlaiDKW5CU0ezDE1KSwqd7fyyvBOlb4UI8sa1QE7SKCp-G3nmL8dFJAmdWSyjWAjAPtavfud3K6li2SKMnCmOrJJLVQOoBW3tM3y2agK5H53oyQOAujmP3BBaMIEt4943gSw3MMQIcqnZFO7SocwvKrbY05lQu86doNiIf1WdvSfjFhayaBtTHjzqw6uMq8uLmtPkoACXJBqg';
+        var http = require('https');
 
-})*/
+        http.get('https://www.googleapis.com/oauth2/v3/tokeninfo?id_token=' + tokenId, function(response) {
+            var str = '';
+            console.log('Response is ' + response.statusCode);
+
+            response.on('data', function(chunk) {
+                str += chunk;
+            });
+
+            response.on('end', function() {
+                console.log(str);
+                var obj = JSON.parse(str);
+                console.log(obj.sub);
+                if (obj.aud === configAuth.googleAuth.clientID) {
+                    console.log("THEY ARE EQUAL");
+                    res.sendStatus(200);
+                }
+                else {
+                    res.sendStatus(400);
+                }
+            });
+        })
+    }
+});
+
+
 
 /* USER UPDATE  */
 router.post("/updateUser", function(req, res, next) {

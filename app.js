@@ -145,7 +145,7 @@ function initGoogleLoginStrategy() {
       );
 
       var insertUser = function(profile) {
-         console.log("user createIndex " + profile.id);
+        console.log("user createIndex " + profile.id);
         global.db.collection(constants.USERS).insert({
           googleId: profile.id
         }, function(err, user) {

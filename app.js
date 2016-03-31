@@ -10,6 +10,8 @@ var passport = require('passport');
 var JsonStrategy = require('passport-json').Strategy;
 var GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 
+var TwitterTokenStrategy = require('passport-twitter-token');
+
 var auth = require('./auth');
 
 var routes = require('./routes/index');
@@ -32,7 +34,8 @@ MongoClient.connect(databaseUrl, function(err, database) {
   console.log("global.db exists? " + global.db);
   initPassportStrategy();
   initFacebookPassportStrategy();
-  initGoogleLoginStrategy()
+  initGoogleLoginStrategy();
+  initTwitterLoginStrategy();
 });
 
 
@@ -62,7 +65,7 @@ function initPassportStrategy() {
         if (user.phone == phone && user.password == password) {
           console.log("User found! " + phone);
           console.log("phone" + user.phone);
-          console.log("user" + user.password);
+          console.log("user password" + user.password);
         }
         else {
           console.log("User Not found! " + phone);
@@ -178,6 +181,22 @@ function initGoogleLoginStrategy() {
 }
 
 //========================================================
+
+function initTwitterLoginStrategy() {
+  passport.use('twitter', new TwitterTokenStrategy({
+    consumerKey: "e4e291ad348d69a85aa849467eaf9826205a4256",
+    consumerSecret: "b1969b119b0749a4a3b8b26a9a83d882190144a3e31bb730d8ae5dba67244232"
+  }, function(token, tokenSecret, profile, done) {
+    console.log("twitter inserting into");
+    global.db.collection(constants.USERS).findOrCreate({
+      twitterId: profile.id
+    }, function(error, user) {
+      console.log("Twitter user created!");
+      return done(error, user);
+    });
+  }));
+
+}
 
 var app = express();
 

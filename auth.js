@@ -8,9 +8,9 @@ module.exports = {
     },
 
     'twitterAuth' : {
-        'consumerKey'       : 'your-consumer-key-here',
-        'consumerSecret'    : 'your-client-secret-here',
-        'callbackURL'       : 'http://localhost:8080/auth/twitter/callback'
+        'consumerKey'       : '3btcNQUEvlEIH6S4UPpFsDxqI',
+        'consumerSecret'    : 'dZr979eDF9eisvRhKLCtJE65Cumdxy5amE5KJX557aBJfbteOC',
+        'callbackURL'       : 'https://www.example.com/'
     },
 
     'googleAuth' : {

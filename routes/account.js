@@ -12,9 +12,9 @@ var configAuth = require('../auth');
 
 var twitterAPI = require('node-twitter-api');
 var twitter = new twitterAPI({
-    consumerKey: '3btcNQUEvlEIH6S4UPpFsDxqI',
-    consumerSecret: 'dZr979eDF9eisvRhKLCtJE65Cumdxy5amE5KJX557aBJfbteOC',
-    callback: 'https://www.example.com/'
+    consumerKey: configAuth.twitterAuth.consumerKey,
+    consumerSecret: configAuth.twitterAuth.consumerSecret,
+    callback: configAuth.twitterAuth.consumerSecret
 });
 
 
@@ -280,23 +280,20 @@ router.post('/googleLogin', function(req, res, next) {
 router.post('/twitterLogin', function(req, res, next) {
     console.log("Twitter login");
 
+    var token = req.body.token;
+    var secret = req.body.secret;
     var twitterId;
 
     if (!isHeaderValid(req, res)) return res.sendStatus(400);
 
-    var token = req.body.token;
-    /*  if (token) {
-        console.log("token found");
-        // verifyTwitterToken(token);
+    if (!token || !secret) {
+        console.log("token not found");
+        return res.sendStatus(400);
     }
-    else {
-        res.sendStatus(400);
-    }
-*/
 
     console.log("req.body.token " + req.body.token);
 
-    twitter.verifyCredentials(req.body.token, "jtypvLKUNlBZM4WACP90MTj6D58BwADSMxmill7uaxubk", "", function(error, data, response) {
+    twitter.verifyCredentials(token, secret, "", function(error, data, response) {
         if (error) {
             //something was wrong with either accessToken or accessTokenSecret 
             console.log("twitter token error! " + data);
@@ -315,7 +312,6 @@ router.post('/twitterLogin', function(req, res, next) {
     });
 
     var createIndex = function() {
-        // Get the documents collection
         var users = global.db.collection(constants.USERS);
         users.createIndex({
                 "phone": 1,
@@ -334,7 +330,6 @@ router.post('/twitterLogin', function(req, res, next) {
             }
         );
     }
-
 
     var findUser = function(db, users) {
         console.log("findUsers: twitterId " + twitterId);
@@ -363,7 +358,6 @@ router.post('/twitterLogin', function(req, res, next) {
     var insertUser = function(db, users) {
         console.log("user insertion " + users)
 
-        // Insert user document
         users.insertOne({
             social: "twitter",
             "twitterId": twitterId,
@@ -390,16 +384,7 @@ router.post('/twitterLogin', function(req, res, next) {
     };
 
     var authorization = function(user) {
-        console.log("facebookAuthorization function");
-
-        // current time + 15days, 1296000 seconds
-
-        // var tokenTimeExpired = Math.round(new Date().getTime() / 1000) + 1296000;
-
-        /*        var token = jwt.encode({
-                    id: user._id,
-                    exp: tokenTimeExpired
-                }, global.app.get('jwtTokenSecret'));*/
+        console.log("twitter authorization function");
 
         return res.end(JSON.stringify({
             phone: user.phone,
@@ -409,10 +394,7 @@ router.post('/twitterLogin', function(req, res, next) {
         }));
     }
 
-
 });
-
-
 
 /* USER UPDATE  */
 router.post("/updateUser", function(req, res, next) {

@@ -35,7 +35,6 @@ MongoClient.connect(databaseUrl, function(err, database) {
   initPassportStrategy();
   initFacebookPassportStrategy();
   initGoogleLoginStrategy();
-  initTwitterLoginStrategy();
 });
 
 
@@ -161,42 +160,9 @@ function initGoogleLoginStrategy() {
   ));
 
 
-  /*passport.use('google', new GoogleStrategy({
-      clientID: auth.googleAuth.clientID,
-      clientSecret: auth.googleAuth.clientSecret,
-      callbackURL: auth.googleAuth.callbackURL,
-    },
-    function(token, tokenSecret, profile, cb) {
-      console.log("Google tokenSecret " + tokenSecret);
-      console.log("Google Auth " + profile.id);
-      global.db.collection(constants.USERS).findOrCreate({
-        googleId: profile.id
-      }, function(err, user) {
-        console.log("Google Auth Done!");
-        return cb(err, user);
-      });
-    }
-  ));
-*/
 }
 
 //========================================================
-
-function initTwitterLoginStrategy() {
-  passport.use('twitter', new TwitterTokenStrategy({
-    consumerKey: "e4e291ad348d69a85aa849467eaf9826205a4256",
-    consumerSecret: "b1969b119b0749a4a3b8b26a9a83d882190144a3e31bb730d8ae5dba67244232"
-  }, function(token, tokenSecret, profile, done) {
-    console.log("twitter inserting into");
-    global.db.collection(constants.USERS).findOrCreate({
-      twitterId: profile.id
-    }, function(error, user) {
-      console.log("Twitter user created!");
-      return done(error, user);
-    });
-  }));
-
-}
 
 var app = express();
 

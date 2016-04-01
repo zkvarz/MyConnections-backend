@@ -10,6 +10,13 @@ var passport = require('passport');
 
 var configAuth = require('../auth');
 
+var twitterAPI = require('node-twitter-api');
+var twitter = new twitterAPI({
+    consumerKey: '3btcNQUEvlEIH6S4UPpFsDxqI',
+    consumerSecret: 'dZr979eDF9eisvRhKLCtJE65Cumdxy5amE5KJX557aBJfbteOC',
+    callback: 'https://www.example.com/'
+});
+
 
 /* CREATE account. */
 router.post('/create', function(req, res, next) {
@@ -272,54 +279,137 @@ router.post('/googleLogin', function(req, res, next) {
 /* TWITTER LOGIN */
 router.post('/twitterLogin', function(req, res, next) {
     console.log("Twitter login");
-    
+
+    var twitterId;
+
     if (!isHeaderValid(req, res)) return res.sendStatus(400);
 
     var token = req.body.token;
-    if (token) {
+    /*  if (token) {
         console.log("token found");
         // verifyTwitterToken(token);
     }
     else {
         res.sendStatus(400);
     }
+*/
 
+    console.log("req.body.token " + req.body.token);
 
-    passport.authenticate('twitter'),
-        function(req, res) {
-            // do something with req.user 
-            console.log("Twitter login successful!");
-            res.send(req.user ? 200 : 401);
+    twitter.verifyCredentials(req.body.token, "jtypvLKUNlBZM4WACP90MTj6D58BwADSMxmill7uaxubk", "", function(error, data, response) {
+        if (error) {
+            //something was wrong with either accessToken or accessTokenSecret 
+            console.log("twitter token error! " + data);
+            res.send(401);
         }
+        else {
+            //accessToken and accessTokenSecret can now be used to make api-calls (not yet implemented) 
+            //data contains the user-data described in the official Twitter-API-docs 
+            //you could e.g. display his screen_name 
+            console.log("twitter token valid!");
+            console.log(data["screen_name"]);
+            console.log("twitterId: " + data["id"]);
+            twitterId = data["id"].toString();
+            createIndex();
+        }
+    });
+
+    var createIndex = function() {
+        // Get the documents collection
+        var users = global.db.collection(constants.USERS);
+        users.createIndex({
+                "phone": 1,
+                "twitterId": 1
+            }, {
+                unique: true,
+                sparse: true
+            },
+            function(err, results) {
+                if (err) console.log(err)
+                assert.equal(err, null);
+                console.log("user createIndex")
+                console.log(results);
+
+                findUser(global.db, users);
+            }
+        );
+    }
 
 
-    /*    function verifyTwitterToken(tokenId) {
+    var findUser = function(db, users) {
+        console.log("findUsers: twitterId " + twitterId);
+        users.findOne({
+            twitterId: twitterId
+        }, function(err, document) {
+            if (err)
+                console.log(err)
+            else {
+                if (!document)
+                    insertUser(global.db, users);
+                else {
+                    console.log("document found! " + document.twitterId);
+                    console.log({
+                        "twitterId": twitterId,
+                        phone: document.phone,
+                        social: "twitter",
+                    });
+                    console.log("DOCUMENT OBJECT" + document);
+                    authorization(users);
+                }
+            }
+        });
+    }
 
-            // var tokenId = 'eyJhbGciOiJSUzI1NiIsImtpZCI6IjA3YjlhZDg5ZWFhMTQxNWM1NzA3Y2ZkNWViMDU4ZGJmOWIwOTY4NTkifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiIzNTY1Njk2NzUyNTEtdmNxMWptZnFzaWNjdmlkdHNhcDduZmNrdmFtYTYyMjguYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDIxMTQ5MDk2OTQ2NzIwNDk5OTQiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiYXpwIjoiMzU2NTY5Njc1MjUxLW8yZHNuam43bTA3OGcwMWwxNjg5YTkxYzFxa29zdWJxLmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29tIiwiZW1haWwiOiJ6a3ZhcnpAZ21haWwuY29tIiwiaWF0IjoxNDU5MzYzNDk5LCJleHAiOjE0NTkzNjcwOTksIm5hbWUiOiJLaXJpbGwgVmFyaXZvZGEiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDQuZ29vZ2xldXNlcmNvbnRlbnQuY29tLy1KYVNqSjBWa0lrNC9BQUFBQUFBQUFBSS9BQUFBQUFBQUFFby9FRXUzdWJrd0Y1Yy9zOTYtYy9waG90by5qcGciLCJnaXZlbl9uYW1lIjoiS2lyaWxsIiwiZmFtaWx5X25hbWUiOiJWYXJpdm9kYSIsImxvY2FsZSI6InJ1In0.M4C6EuEseb3XTWdPrQ2_GuogaiJm6Q1xKJYhL6oRS0QWzpdpZB13NJ1_2lvAadwEJtS0WpgEZ4AVXf31pyZl494iYj6ujcsGVo-K6hxyeljsegIeQ9m9a6njpQreA_NYWtY-xMKLEVlaiDKW5CU0ezDE1KSwqd7fyyvBOlb4UI8sa1QE7SKCp-G3nmL8dFJAmdWSyjWAjAPtavfud3K6li2SKMnCmOrJJLVQOoBW3tM3y2agK5H53oyQOAujmP3BBaMIEt4943gSw3MMQIcqnZFO7SocwvKrbY05lQu86doNiIf1WdvSfjFhayaBtTHjzqw6uMq8uLmtPkoACXJBqg';
-            var http = require('https');
+    var insertUser = function(db, users) {
+        console.log("user insertion " + users)
 
-            http.get('https://www.googleapis.com/oauth2/v3/tokeninfo?id_token=' + tokenId, function(response) {
-                var str = '';
-                console.log('Response is ' + response.statusCode);
-
-                response.on('data', function(chunk) {
-                    str += chunk;
+        // Insert user document
+        users.insertOne({
+            social: "twitter",
+            "twitterId": twitterId,
+        }, function(err, result) {
+            if (err) {
+                console.log("Sorry, twitter login error!");
+                console.log(err)
+                res.writeHead(400, {
+                    'Content-Type': 'text/plain'
                 });
-
-                response.on('end', function() {
-                    console.log(str);
-                    var obj = JSON.parse(str);
-                    console.log(obj.sub);
-                    if (obj.aud === configAuth.googleAuth.clientID) {
-                        console.log("THEY ARE EQUAL");
-                        res.sendStatus(200);
-                    }
-                    else {
-                        res.sendStatus(400);
-                    }
+                return res.end(JSON.stringify({
+                    error: "Sorry, twitter login error."
+                }));
+            }
+            else {
+                console.log("Inserted a document into the users collection.");
+                console.log({
+                    "twitterId": twitterId,
+                    social: "twitter",
                 });
-            })
-        }*/
+                findUser(global.db, users);
+            }
+        });
+    };
+
+    var authorization = function(user) {
+        console.log("facebookAuthorization function");
+
+        // current time + 15days, 1296000 seconds
+
+        // var tokenTimeExpired = Math.round(new Date().getTime() / 1000) + 1296000;
+
+        /*        var token = jwt.encode({
+                    id: user._id,
+                    exp: tokenTimeExpired
+                }, global.app.get('jwtTokenSecret'));*/
+
+        return res.end(JSON.stringify({
+            phone: user.phone,
+            id: user._id,
+            twitterId: twitterId,
+            social: "twitter"
+        }));
+    }
+
+
 });
 
 
@@ -393,6 +483,28 @@ router.post("/updateUser", function(req, res, next) {
         res.statusCode = 401;
         res.end('Authorization error!');
     }
+
+})
+
+/* GET users. */
+router.post('/removeUser', function(req, res, next) {
+
+    global.db.collection('users', function(err, collection) {
+        if (err) {
+            console.log(err);
+            res.end("so bad!", 400);
+        }
+        collection.remove({
+            _id: new mongo.ObjectID(req.body.id)
+        }, function(err, results) {
+            if (err) {
+                console.log(err);
+                res.end("so bad!", 400);
+            }
+            console.log(results);
+            res.end("OK");
+        });
+    });
 
 })
 

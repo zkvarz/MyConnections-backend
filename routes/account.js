@@ -10,6 +10,8 @@ var passport = require('passport');
 
 var configAuth = require('../auth');
 
+var User = require('../models/user.js');
+
 var twitterAPI = require('node-twitter-api');
 var twitter = new twitterAPI({
     consumerKey: configAuth.twitterAuth.consumerKey,
@@ -205,21 +207,13 @@ router.post("/facebookLogin", function(req, res, next) {
         var facebookAuthorization = function(user) {
             console.log("facebookAuthorization function");
 
-            // current time + 15days, 1296000 seconds
-            var tokenTimeExpired = Math.round(new Date().getTime() / 1000) + 1296000;
-
-            var token = jwt.encode({
-                id: user._id,
-                exp: tokenTimeExpired
-            }, global.app.get('jwtTokenSecret'));
-
             return res.end(JSON.stringify({
                 phone: user.phone,
                 id: user._id,
                 "facebookId": facebookId,
                 social: "facebook",
-                token: token,
-                expires: tokenTimeExpired,
+                token: getToken(user),
+                expires: getTokenTimeExpired(),
                 facebookToken: facebookToken
             }));
         }
@@ -236,9 +230,12 @@ var http = require('http');
 
 /* GOOGLE LOGIN */
 router.post('/googleLogin', function(req, res, next) {
+    console.log("googleLogin");
     if (!isHeaderValid(req, res)) return res.sendStatus(400);
 
-    var idToken = req.body.idToken;
+    var googleId;
+
+    var idToken = req.body.token;
     if (idToken) {
         verifyGoogleTokenId(idToken);
     }
@@ -246,9 +243,8 @@ router.post('/googleLogin', function(req, res, next) {
         res.sendStatus(400);
     }
 
-
     function verifyGoogleTokenId(tokenId) {
-
+        console.log("verifyGoogleTokenId");
         // var tokenId = 'eyJhbGciOiJSUzI1NiIsImtpZCI6IjA3YjlhZDg5ZWFhMTQxNWM1NzA3Y2ZkNWViMDU4ZGJmOWIwOTY4NTkifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiIzNTY1Njk2NzUyNTEtdmNxMWptZnFzaWNjdmlkdHNhcDduZmNrdmFtYTYyMjguYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDIxMTQ5MDk2OTQ2NzIwNDk5OTQiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiYXpwIjoiMzU2NTY5Njc1MjUxLW8yZHNuam43bTA3OGcwMWwxNjg5YTkxYzFxa29zdWJxLmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29tIiwiZW1haWwiOiJ6a3ZhcnpAZ21haWwuY29tIiwiaWF0IjoxNDU5MzYzNDk5LCJleHAiOjE0NTkzNjcwOTksIm5hbWUiOiJLaXJpbGwgVmFyaXZvZGEiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDQuZ29vZ2xldXNlcmNvbnRlbnQuY29tLy1KYVNqSjBWa0lrNC9BQUFBQUFBQUFBSS9BQUFBQUFBQUFFby9FRXUzdWJrd0Y1Yy9zOTYtYy9waG90by5qcGciLCJnaXZlbl9uYW1lIjoiS2lyaWxsIiwiZmFtaWx5X25hbWUiOiJWYXJpdm9kYSIsImxvY2FsZSI6InJ1In0.M4C6EuEseb3XTWdPrQ2_GuogaiJm6Q1xKJYhL6oRS0QWzpdpZB13NJ1_2lvAadwEJtS0WpgEZ4AVXf31pyZl494iYj6ujcsGVo-K6hxyeljsegIeQ9m9a6njpQreA_NYWtY-xMKLEVlaiDKW5CU0ezDE1KSwqd7fyyvBOlb4UI8sa1QE7SKCp-G3nmL8dFJAmdWSyjWAjAPtavfud3K6li2SKMnCmOrJJLVQOoBW3tM3y2agK5H53oyQOAujmP3BBaMIEt4943gSw3MMQIcqnZFO7SocwvKrbY05lQu86doNiIf1WdvSfjFhayaBtTHjzqw6uMq8uLmtPkoACXJBqg';
         var http = require('https');
 
@@ -264,9 +260,10 @@ router.post('/googleLogin', function(req, res, next) {
                 console.log(str);
                 var obj = JSON.parse(str);
                 console.log(obj.sub);
+                googleId = obj.sub;
                 if (obj.aud === configAuth.googleAuth.clientID) {
-                    console.log("THEY ARE EQUAL");
-                    res.sendStatus(200);
+                    console.log("Google Token Valid!");
+                    createIndex();
                 }
                 else {
                     res.sendStatus(400);
@@ -274,6 +271,92 @@ router.post('/googleLogin', function(req, res, next) {
             });
         })
     }
+
+    var createIndex = function() {
+        var users = global.db.collection(constants.USERS);
+        users.createIndex({
+                "phone": 1,
+                "googleId": 1
+            }, {
+                unique: true,
+                sparse: true
+            },
+            function(err, results) {
+                if (err) console.log(err)
+                assert.equal(err, null);
+                console.log("user createIndex")
+                console.log(results);
+
+                findGoogleUser(global.db, users);
+            }
+        );
+    }
+
+    var findGoogleUser = function(db, users) {
+        users.findOne({
+            googleId: googleId
+        }, function(err, document) {
+            if (err)
+                console.log(err)
+            else {
+                if (!document)
+                    insertUser(global.db, users);
+                else {
+                    console.log("document found! " + document.googleId);
+                    console.log({
+                        "googleId": googleId,
+                        phone: document.phone,
+                        social: "google",
+                    });
+                    console.log("DOCUMENT OBJECT" + document);
+                    authorizationResponse(document);
+                }
+            }
+        });
+    }
+
+    var insertUser = function(db, users) {
+        console.log("user insertion " + users)
+
+        // Insert user document
+        users.insertOne({
+            social: "google",
+            googleId: googleId,
+        }, function(err, result) {
+            if (err) {
+                console.log("Sorry, facebook login error!");
+                console.log(err)
+                res.writeHead(400, {
+                    'Content-Type': 'text/plain'
+                });
+                return res.end(JSON.stringify({
+                    error: "Sorry, facebook login error."
+                }));
+            }
+            else {
+                console.log("Inserted a document into the users collection.");
+                console.log({
+                    "googleId": googleId,
+                    social: "google",
+                });
+                findGoogleUser(global.db, users);
+            }
+        });
+    };
+
+    var authorizationResponse = function(user) {
+        console.log("facebookAuthorization function");
+
+        return res.end(JSON.stringify({
+            phone: user.phone,
+            id: user._id,
+            "googleId": googleId,
+            social: "google",
+            token: getToken(user),
+            expires: getTokenTimeExpired(),
+        }));
+    }
+
 });
 
 /* TWITTER LOGIN */
@@ -349,7 +432,7 @@ router.post('/twitterLogin', function(req, res, next) {
                         social: "twitter",
                     });
                     console.log("DOCUMENT OBJECT" + document);
-                    authorization(users);
+                    authorization(document);
                 }
             }
         });
@@ -385,13 +468,16 @@ router.post('/twitterLogin', function(req, res, next) {
 
     var authorization = function(user) {
         console.log("twitter authorization function");
+        console.log("id is: " + user._id);
 
-        return res.end(JSON.stringify({
-            phone: user.phone,
-            id: user._id,
-            twitterId: twitterId,
-            social: "twitter"
-        }));
+        User.findById(user._id, function(err, user) {
+            if (err) {
+                console.log("findById error")
+            }
+            else {
+                return res.end(JSON.stringify(user));
+            }
+        });
     }
 
 });
@@ -403,8 +489,6 @@ router.post("/updateUser", function(req, res, next) {
     console.log("updateUser");
 
     var token = req.body.token;
-    var phone = req.body.phone;
-    var facebookId = req.body.facebookId;
 
     var users = global.db.collection(constants.USERS);
 
@@ -468,7 +552,7 @@ router.post("/updateUser", function(req, res, next) {
 
 })
 
-/* GET users. */
+/* REMOVE users. */
 router.post('/removeUser', function(req, res, next) {
 
     global.db.collection('users', function(err, collection) {
@@ -550,6 +634,19 @@ function isHeaderValid(req, res) {
     if (!contype || contype.indexOf('application/json') !== 0)
         isValid = false;
     return isValid;
+}
+
+function getTokenTimeExpired() {
+    // current time + 15days, 1296000 seconds
+    return Math.round(new Date().getTime() / 1000) + 1296000;
+}
+
+function getToken(user) {
+    var token = jwt.encode({
+        id: user._id,
+        exp: getTokenTimeExpired()
+    }, global.app.get('jwtTokenSecret'));
+    return token;
 }
 
 

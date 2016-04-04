@@ -19,19 +19,14 @@ var users = require('./routes/users');
 var account = require('./routes/account');
 var googleAuth = require('./routes/googleAuth');
 
-//mongodb database
-var MongoClient = require('mongodb').MongoClient;
 var assert = require("assert");
-var db;
+var mongo = require('./mongo.js');
 
-//database connection
-var databaseUrl = 'mongodb://localhost:27017/myconnections-backend';
-MongoClient.connect(databaseUrl, function(err, database) {
-  assert.equal(err);
-  if (err) console.log("Error in database connect occured: " + err);
-  console.log("Connected correctly to server");
-  this.db = database;
-  console.log("global.db exists? " + global.db);
+mongo.init(function(error) {
+  if (error)
+    throw error;
+
+  // app.listen(80); //database is initialized, ready to listen for connections
   initPassportStrategy();
   initFacebookPassportStrategy();
   initGoogleLoginStrategy();
@@ -245,6 +240,5 @@ app.use(function(err, req, res, next) {
 
 module.exports = app;
 
-global.db = db;
-global.databaseUrl = databaseUrl;
+// global.databaseUrl = databaseUrl;
 global.app = app;

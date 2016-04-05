@@ -10,8 +10,6 @@ var passport = require('passport');
 var JsonStrategy = require('passport-json').Strategy;
 var GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 
-var TwitterTokenStrategy = require('passport-twitter-token');
-
 var auth = require('./auth');
 
 var routes = require('./routes/index');
@@ -21,6 +19,7 @@ var googleAuth = require('./routes/googleAuth');
 
 var assert = require("assert");
 var mongo = require('./mongo.js');
+var gcm = require('./gcm.js');
 
 mongo.init(function(error) {
   if (error)

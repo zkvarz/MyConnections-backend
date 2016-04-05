@@ -5,11 +5,8 @@ var assert = require('assert');
 var jwt = require('jwt-simple');
 
 var mongo = require('mongodb');
-
 var passport = require('passport');
-
 var configAuth = require('../auth');
-
 var User = require('../models/user.js');
 
 var twitterAPI = require('node-twitter-api');
@@ -223,10 +220,6 @@ router.post("/facebookLogin", function(req, res, next) {
     }
 })
 
-
-// We need this to build our post string
-var querystring = require('querystring');
-var http = require('http');
 
 /* GOOGLE LOGIN */
 router.post('/googleLogin', function(req, res, next) {

@@ -1,11 +1,8 @@
-// var app = require('./app');
 var mongo = require('../mongo.js');
-
 var jwt = require('jwt-simple');
 
 var User = function(document) {
     console.log("Constructor called " + JSON.stringify(document));
-    // this.data = data;
     this.id = document._id;
     this.phone = document.phone;
     this.twitterId = document.twitterId;

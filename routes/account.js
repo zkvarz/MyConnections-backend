@@ -4,7 +4,8 @@ var constants = require("../constants");
 var assert = require('assert');
 var jwt = require('jwt-simple');
 
-var mongo = require('mongodb');
+var mongo = require('../mongo.js');
+var mongodb = require('mongodb');
 var passport = require('passport');
 var configAuth = require('../auth');
 var User = require('../models/user.js');
@@ -491,7 +492,7 @@ router.post("/updateUser", function(req, res, next) {
         console.log("user id! : " + decoded.id);
 
         users.update({
-            "_id": new mongo.ObjectID(decoded.id)
+            "_id": new mongodb.ObjectID(decoded.id)
         }, {
             $set: {
                 phone: req.body.phone
@@ -515,7 +516,7 @@ router.post("/updateUser", function(req, res, next) {
 
         var findUser = function(db, users, id) {
             users.findOne({
-                "_id": new mongo.ObjectID(id)
+                "_id": new mongodb.ObjectID(id)
             }, function(err, document) {
                 if (err)
                     console.log(err)
@@ -554,7 +555,7 @@ router.post('/removeUser', function(req, res, next) {
             res.end("so bad!", 400);
         }
         collection.remove({
-            _id: new mongo.ObjectID(req.body.id)
+            _id: new mongodb.ObjectID(req.body.id)
         }, function(err, results) {
             if (err) {
                 console.log(err);
@@ -620,6 +621,87 @@ router.post('/getUsers', function(req, res, next) {
 
 });
 
+/* GCM REGISTRATION ID. */
+router.post('/gcmRegistration', function(req, res, next) {
+    if (!isHeaderValid(req, res)) return res.sendStatus(400);
+
+    var registrationId = req.body.gcmToken;
+
+    var decodedToken = getDecodedToken(req, res);
+    if (decodedToken) {
+        // decodedToken.id
+        if (registrationId) {
+            // insertRegistrationId();
+            mongo.users.update({
+                "_id": new mongodb.ObjectID(decodedToken.id)
+            }, {
+                $set: {
+                    "gcm_registration_id": registrationId
+                }
+            }, function(err, user) {
+                if (err) {
+                    console.log(err)
+                    res.end(JSON.stringify({
+                        "error": "Account registrationId error!"
+                    }));
+                }
+                else {
+                    if (!user)
+                        console.log("Document not found");
+                    else {
+                        console.log("UPDATE INFO" + user);
+                        res.sendStatus(200);
+                    }
+                }
+            });
+        }
+    }
+    else {
+        console.log("token invalid!");
+    }
+
+    //when called from if above, doesn't work for some reason
+    /* var insertRegistrationId = function() {
+         console.log("user update ");
+     }*/
+
+
+});
+
+function getDecodedToken(req, res) {
+    var token = (req.body && req.body.token) || (req.query && req.query.token) || req.headers['x-access-token'];
+
+    console.log("global.app.get('jwtTokenSecret') " + global.app.get('jwtTokenSecret'));
+
+    if (token) {
+        try {
+            console.log("Decoding token...");
+            var decoded = jwt.decode(token, global.app.get('jwtTokenSecret'));
+
+            // handle token here
+            console.log("Date.now(): " + new Date().getTime() / 1000);
+
+            if (decoded.exp <= new Date().getTime() / 1000) {
+                res.end('Access token has expired', 400);
+            }
+            else {
+                console.log("user id: " + decoded.id);
+                return decoded;
+            }
+        }
+        catch (err) {
+            console.log("Eror! " + err);
+            res.statusCode = 401;
+            res.end('Authorization error!');
+            return null;
+        }
+    }
+    else {
+        console.log("TOKEN NOT FOUND");
+        return null;
+    }
+}
+
 function isHeaderValid(req, res) {
     var contype = req.headers['content-type'];
     var isValid = true;
@@ -630,7 +712,7 @@ function isHeaderValid(req, res) {
 }
 
 function getTokenTimeExpired() {
-    // current time + 15days, 1296000 seconds
+    // current time + (15days = 1296000 seconds)
     return Math.round(new Date().getTime() / 1000) + 1296000;
 }
 

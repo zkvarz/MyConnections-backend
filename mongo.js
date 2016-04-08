@@ -46,8 +46,8 @@ var createUsersIndex = function() {
 }
 
 var createChatRoomsIndex = function() {
-    var users = this.db.collection("chatRooms");
-    users.createIndex({
+    var chatRooms = this.db.collection("chatRooms");
+    chatRooms.createIndex({
             "name": 1,
         }, {
             unique: true,
@@ -59,6 +59,19 @@ var createChatRoomsIndex = function() {
             console.log(results);
         }
     );
+    
+    chatRooms.insertOne({
+        name: "global",
+        timestamp: new Date().getTime()
+    }, function(err, result) {
+        if (err) {
+            console.log("chatRooms Duplicate key!");
+            console.log(err)
+        }
+        else {
+            console.log("Inserted a document into the chatRooms collection.");
+        }
+    });
 }
 
 var createMessagesIndex = function() {}

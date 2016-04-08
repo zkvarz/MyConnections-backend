@@ -15,6 +15,7 @@ var auth = require('./auth');
 var routes = require('./routes/index');
 var users = require('./routes/users');
 var account = require('./routes/account');
+var chat = require('./routes/chat');
 var googleAuth = require('./routes/googleAuth');
 
 var assert = require("assert");
@@ -203,6 +204,7 @@ app.get('/login',
 app.use('/', routes);
 app.use('/users', users);
 app.use('/account', account);
+app.use('/chat', chat);
 app.use('/googleAuth', googleAuth);
 
 // catch 404 and forward to error handler

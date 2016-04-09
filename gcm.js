@@ -3,9 +3,8 @@
 
 var gcm = require('node-gcm');
 
-var message = new gcm.Message();
-message.addData('data', 'msg1');
-message.addNotification('title', 'Hello');
+var exports = module.exports = {};
+
 
 /*var message = new gcm.Message({
     collapseKey: 'demo',
@@ -31,7 +30,24 @@ var regTokens = [];
 var sender = new gcm.Sender('AIzaSyAR7tjjSQGeYR56Vh_lBdud-WIZlkqSC2w');
 
 // Now the sender can be used to send messages
-sender.send(message, { topic: '/topics/global'  }, function (err, response) {
+/*sender.send(message, { topic: '/topics/global'  }, function (err, response) {
     if(err) console.error(err);
     else    console.log("message sent" + response);
-});
+});*/
+
+exports.sendMessage = function(messageObject) {
+    var message = new gcm.Message();
+    message.addData('data', messageObject);
+    
+    // TEMP SOLUTION~
+    message.addData('flag', 'group');
+    message.addNotification('title', 'Hello');
+
+    sender.send(message, {
+        topic: '/topics/global'
+        // topic: '/topics/' + messageObject.chat_room_id
+    }, function(err, response) {
+        if (err) console.error(err);
+        else console.log("message sent" + response);
+    });
+};

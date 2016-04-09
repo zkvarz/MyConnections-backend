@@ -2,6 +2,8 @@ var express = require('express');
 var router = express.Router();
 var jwt = require('jwt-simple');
 var mongo = require('../mongo.js');
+var User = require('../models/user.js');
+var gcm = require("../gcm.js");
 
 /* GET chatRooms. */
 router.post('/getChatRooms', function(req, res, next) {
@@ -17,7 +19,6 @@ router.post('/getChatRooms', function(req, res, next) {
     }
 
     function findChatRooms() {
-        // var cursor = global.db.collection("chatRooms").find();
         mongo.chatRooms.find().toArray(function(err, docs) {
             if (!err)
                 console.log("retrieved records:");
@@ -28,13 +29,75 @@ router.post('/getChatRooms', function(req, res, next) {
 
 });
 
+/* GET Chat Room messages. */
+router.post('/getChatRoomMessages', function(req, res, next) {
+    if (!isHeaderValid(req, res)) return res.sendStatus(400);
+
+    var decodedToken = getDecodedToken(req, res);
+    if (decodedToken) {
+        findChatRoomMessages();
+    }
+    else {
+        console.log("TOKEN NOT FOUND")
+        next();
+    }
+
+    function findChatRoomMessages() {
+        console.log("findChatRoomMessages")
+
+        var messagesArray = [];
+        var itemsProcessed = 0;
+
+        mongo.messages.find({
+            chat_room_id: req.body.id
+        }).toArray(function(err, docs) {
+            if (!err)
+                console.log("retrieved records:");
+            console.log(docs);
+            messagesArray = docs;
+            iterateMessagesArray();
+        });
+
+        var iterateMessagesArray = function() {
+
+            var arrayLength = messagesArray.length;
+            for (var i = 0; i < arrayLength; i++) {
+                console.log("user_id " + messagesArray[i].user_id);
+                console.log("messagesArray[i] " + messagesArray[i]);
+                modifyMessage(i);
+            }
+        }
+
+        var modifyMessage = function(i) {
+            User.findById(messagesArray[i].user_id, function(err, user) {
+                if (err) {
+                    console.log("findById error")
+                }
+                else {
+                    messagesArray[i].loginResponse = user;
+                    console.log("processItem modified: " + JSON.stringify(messagesArray[i]))
+                    itemsProcessed++;
+                    if (itemsProcessed === messagesArray.length) {
+                        makeResponse();
+                    }
+                }
+            });
+        }
+
+        var makeResponse = function() {
+            console.log("RESPONSE messagse")
+            res.end(JSON.stringify(messagesArray));
+        }
+    };
+
+});
+
 /* Send Message. */
 router.post('/sendMessage', function(req, res, next) {
     if (!isHeaderValid(req, res)) return res.sendStatus(400);
 
     var decodedToken = getDecodedToken(req, res);
     if (decodedToken) {
-        //req.body.message
         saveMessage();
     }
     else {
@@ -42,15 +105,28 @@ router.post('/sendMessage', function(req, res, next) {
         next();
     }
 
+    var userObject;
+
     function saveMessage() {
+
+        User.findById(decodedToken.id, function(err, user) {
+            if (err) {
+                console.log("findById error")
+            }
+            else {
+                userObject = user;
+            }
+        });
+
         // var cursor = global.db.collection("messages").find();
+        var currentTimeStamp = new Date().getTime();
         var insertObject = {
-                chat_room_id: req.body.chatRoomId,
-                user_id: decodedToken.id,
-                message: req.body.message,
-                timestamp: new Date().getTime()
-            };
-        
+            chat_room_id: req.body.chatRoomId,
+            user_id: decodedToken.id,
+            message: req.body.message,
+            timestamp: currentTimeStamp,
+        };
+
         mongo.messages.insert(insertObject,
             function(err, records) {
                 if (err) {
@@ -62,18 +138,18 @@ router.post('/sendMessage', function(req, res, next) {
                     return res.end("Sorry, message send error.");
                 }
                 else {
-                    console.log("Inserted a document into the collection.");
-                    console.log("insertObject  " + insertObject);
-                    console.log("insertObject id " + insertObject._id);
-                    console.log("insertObject createdAt " + insertObject.createdAt);
-                    console.log("records  " + records);
-                    console.log("records id  " + records._id);
-                    console.log("_ID is: " + records._id);
-                    return res.end(JSON.stringify({
+                    
+                    var sendMessage = {
                         id: insertObject._id,
                         message: req.body.message,
-                        createdAt: insertObject.timestamp
-                    }));
+                        chat_room_id: req.body.chatRoomId,
+                        timestamp: currentTimeStamp,
+                        loginResponse: userObject
+                    };
+                    console.log("Inserted a document into the collection.");
+                    console.log("response object: " + JSON.stringify(sendMessage));
+                    gcm.sendMessage(sendMessage);
+                    return res.end(JSON.stringify(sendMessage));
                 }
             });
     };

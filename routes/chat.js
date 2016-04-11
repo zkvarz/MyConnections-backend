@@ -29,13 +29,101 @@ router.post('/getChatRooms', function(req, res, next) {
 
 });
 
+
+/* GET Chat PRIVATE Room messages. */
+router.post('/getChatPrivateRoom', function(req, res, next) {
+    if (!isHeaderValid(req, res)) return res.sendStatus(400);
+
+    var decodedToken = getDecodedToken(req, res);
+    var chatUserId = req.body.id;
+
+    getPrivateChatRoom();
+
+    function getPrivateChatRoom() {
+        var cursor = mongo.chatRoomsPrivate.find({
+            $and: [{
+                'users.by': chatUserId
+            }, {
+                'users.by': decodedToken.id
+            }]
+
+        });
+        cursor.each(function(err, doc) {
+            if (err) console.log(err);
+            if (doc != null) {
+                console.log("private chat room found!")
+
+                console.dir(doc);
+                var sendMessage = {
+                    chatRoomId: doc._id,
+                };
+                console.log("sendMessage: " + sendMessage)
+
+                // return res.end(JSON.stringify(doc));
+                return res.end(JSON.stringify(sendMessage));
+            }
+            else {
+                console.log("private chat room NOT found!")
+                createPrivateChatRoom();
+            }
+        });
+    }
+
+    function createPrivateChatRoom() {
+        var array = [{
+            userId: req.body.userId
+        }, {
+            userId: decodedToken.id
+        }];
+        var insertObject = {
+            users: array
+        };
+
+        mongo.chatRoomsPrivate.insert(insertObject,
+            function(err, records) {
+                if (err) {
+                    console.log("Duplicate key!");
+                    console.log(err)
+                    res.writeHead(400, {
+                        'Content-Type': 'text/plain'
+                    });
+                    return res.end("Sorry, message send error.");
+                }
+                else {
+                    var sendMessage = {
+                        chatRoomId: insertObject._id,
+                    };
+                    console.log("Inserted a document into the collection.");
+                    console.log("response object: " + JSON.stringify(sendMessage));
+
+                    // gcm.sendMessage(sendMessage);
+                    return res.end(JSON.stringify(sendMessage));
+                }
+            });
+
+    }
+
+
+});
+
 /* GET Chat Room messages. */
 router.post('/getChatRoomMessages', function(req, res, next) {
     if (!isHeaderValid(req, res)) return res.sendStatus(400);
 
+    var chatRoomId;
+
     var decodedToken = getDecodedToken(req, res);
     if (decodedToken) {
-        findChatRoomMessages();
+        /* if (req.body.userId) {
+             getPrivateChatRoom();
+         }
+         else */
+        if (req.body.chatRoomId) {
+            console.log("chatRoomId " + req.body.chatRoomId);
+            chatRoomId = req.body.chatRoomId;
+            findChatRoomMessages();
+        }
+
     }
     else {
         console.log("TOKEN NOT FOUND")
@@ -49,7 +137,7 @@ router.post('/getChatRoomMessages', function(req, res, next) {
         var itemsProcessed = 0;
 
         mongo.messages.find({
-            chat_room_id: req.body.id
+            chat_room_id: chatRoomId
         }).toArray(function(err, docs) {
             if (!err)
                 console.log("retrieved records:");
@@ -118,7 +206,6 @@ router.post('/sendMessage', function(req, res, next) {
             }
         });
 
-        // var cursor = global.db.collection("messages").find();
         var currentTimeStamp = new Date().getTime();
         var insertObject = {
             chat_room_id: req.body.chatRoomId,
@@ -138,7 +225,6 @@ router.post('/sendMessage', function(req, res, next) {
                     return res.end("Sorry, message send error.");
                 }
                 else {
-                    
                     var sendMessage = {
                         id: insertObject._id,
                         message: req.body.message,

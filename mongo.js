@@ -18,6 +18,7 @@ module.exports.init = function(callback) {
 
         module.exports.users = database.collection('users');
         module.exports.chatRooms = database.collection('chatRooms');
+        module.exports.chatRoomsPrivate = database.collection('chatRoomsPrivate');
         module.exports.messages = database.collection('messages');
         createUsersIndex();
         createChatRoomsIndex();

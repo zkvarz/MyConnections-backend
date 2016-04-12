@@ -1,6 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var jwt = require('jwt-simple');
+var mongodb = require('mongodb');
 var mongo = require('../mongo.js');
 var User = require('../models/user.js');
 var gcm = require("../gcm.js");
@@ -37,25 +38,26 @@ router.post('/getChatPrivateRoom', function(req, res, next) {
     var decodedToken = getDecodedToken(req, res);
     var chatUserId = req.body.id;
 
+    console.log("getChatPrivateRoom");
+    console.log("id " + decodedToken.id);
+    console.log("chatUserId " + chatUserId);
+
     getPrivateChatRoom();
 
     function getPrivateChatRoom() {
-        var cursor = mongo.chatRoomsPrivate.find({
-            $and: [{
-                'users.by': chatUserId
-            }, {
-                'users.by': decodedToken.id
-            }]
-
-        });
-        cursor.each(function(err, doc) {
+        mongo.chatRoomsPrivate.findOne({
+            'users': {
+                $all: [chatUserId, decodedToken.id]
+            }
+        }, function(err, document) {
             if (err) console.log(err);
-            if (doc != null) {
+
+            if (document) {
                 console.log("private chat room found!")
 
-                console.dir(doc);
+                console.dir(document);
                 var sendMessage = {
-                    chatRoomId: doc._id,
+                    chatRoomId: document._id,
                 };
                 console.log("sendMessage: " + sendMessage)
 
@@ -70,11 +72,11 @@ router.post('/getChatPrivateRoom', function(req, res, next) {
     }
 
     function createPrivateChatRoom() {
-        var array = [{
-            userId: req.body.userId
-        }, {
-            userId: decodedToken.id
-        }];
+        var array = [
+            chatUserId,
+            decodedToken.id
+        ];
+
         var insertObject = {
             users: array
         };
@@ -101,6 +103,43 @@ router.post('/getChatPrivateRoom', function(req, res, next) {
                 }
             });
 
+    }
+
+
+});
+
+router.post('/getAllMessages', function(req, res, next) {
+    if (!isHeaderValid(req, res)) return res.sendStatus(400);
+
+    var decodedToken = getDecodedToken(req, res);
+    if (decodedToken) {
+        var messagesArray = [];
+        mongo.messages.find().toArray(function(err, docs) {
+            if (!err)
+                console.log("retrieved records:");
+            console.log(docs);
+            messagesArray = docs;
+            res.send(JSON.stringify(docs));
+            // iterateMessagesArray();
+        });
+    }
+
+
+});
+
+router.post('/getAllPrivateChatRooms', function(req, res, next) {
+    if (!isHeaderValid(req, res)) return res.sendStatus(400);
+
+    var decodedToken = getDecodedToken(req, res);
+    if (decodedToken) {
+        var messagesArray = [];
+        mongo.chatRoomsPrivate.find().toArray(function(err, docs) {
+            if (!err)
+                console.log("retrieved records:");
+            console.log(docs);
+            messagesArray = docs;
+            res.send(JSON.stringify(docs));
+        });
     }
 
 
@@ -272,6 +311,8 @@ function getDecodedToken(req, res) {
     }
     else {
         console.log("TOKEN NOT FOUND");
+        res.statusCode = 401;
+        res.end('TOKEN NOT FOUND');
         return null;
     }
 }

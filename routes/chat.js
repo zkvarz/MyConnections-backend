@@ -153,16 +153,11 @@ router.post('/getChatRoomMessages', function(req, res, next) {
 
     var decodedToken = getDecodedToken(req, res);
     if (decodedToken) {
-        /* if (req.body.userId) {
-             getPrivateChatRoom();
-         }
-         else */
         if (req.body.chatRoomId) {
             console.log("chatRoomId " + req.body.chatRoomId);
             chatRoomId = req.body.chatRoomId;
             findChatRoomMessages();
         }
-
     }
     else {
         console.log("TOKEN NOT FOUND")
@@ -182,11 +177,15 @@ router.post('/getChatRoomMessages', function(req, res, next) {
                 console.log("retrieved records:");
             console.log(docs);
             messagesArray = docs;
-            iterateMessagesArray();
+            if (messagesArray.length > 0) {
+                iterateMessagesArray();
+            }
+            else {
+                makeResponse();
+            }
         });
 
         var iterateMessagesArray = function() {
-
             var arrayLength = messagesArray.length;
             for (var i = 0; i < arrayLength; i++) {
                 console.log("user_id " + messagesArray[i].user_id);
@@ -196,9 +195,10 @@ router.post('/getChatRoomMessages', function(req, res, next) {
         }
 
         var modifyMessage = function(i) {
+            console.log("modifyMessage");
             User.findById(messagesArray[i].user_id, function(err, user) {
                 if (err) {
-                    console.log("findById error")
+                    console.log("findById error");
                 }
                 else {
                     messagesArray[i].loginResponse = user;
@@ -273,7 +273,7 @@ router.post('/sendMessage', function(req, res, next) {
                     };
                     console.log("Inserted a document into the collection.");
                     console.log("response object: " + JSON.stringify(sendMessage));
-                    gcm.sendMessage(sendMessage);
+                    gcm.sendPrivateMessage(sendMessage, req.body.toUserId);
                     return res.end(JSON.stringify(sendMessage));
                 }
             });
